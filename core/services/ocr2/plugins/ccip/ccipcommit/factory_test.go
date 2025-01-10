@@ -5,15 +5,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	ccip2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdataprovidermocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
@@ -28,6 +28,8 @@ import (
 func TestNewReportingPluginRetriesUntilSuccess(t *testing.T) {
 	ctx := tests.Context(t)
 	commitConfig := CommitPluginStaticConfig{}
+	commitConfig.lggr = logger.TestLogger(t)
+	commitConfig.metricsCollector = ccip2.NoopMetricsCollector
 
 	// For this unit test, ensure that there is no delay between retries
 	commitConfig.newReportingPluginRetryConfig = ccipdata.RetryConfig{
