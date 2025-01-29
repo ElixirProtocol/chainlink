@@ -31,7 +31,8 @@ ResendAfterThreshold = '1m'
 Enabled = false
 
 [Transactions.TransactionManagerV2]
-Enabled = false
+Enabled = true
+BlockTime = '3s'
 
 [BalanceMonitor]
 Enabled = true
