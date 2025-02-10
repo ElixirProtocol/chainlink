@@ -2,21 +2,23 @@ package framework
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
-	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/artifacts"
 
 	commoncap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3"
@@ -25,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	coretypes "github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	"github.com/smartcontractkit/chainlink-integrations/evm/types"
@@ -49,27 +52,48 @@ type DonContext struct {
 	p2pNetwork            *FakeRageP2PNetwork
 	capabilityRegistry    *CapabilitiesRegistry
 	workflowRegistry      *WorkflowRegistry
-	syncerFetcherFunc     syncer.FetcherFunc
+	artifactsFetcherFunc  artifacts.FetcherFunc
 	computeFetcherFactory compute.FetcherFactory
+	moduleStoreFactory    SerialisedModuleStoreFactory
+}
+
+type repeatByteReader struct {
+	b byte
+}
+
+func (r *repeatByteReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = r.b
+	}
+	return len(p), nil
+}
+
+func NewRepeatByteReader(b byte) io.Reader {
+	return &repeatByteReader{b: b}
 }
 
 func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
-	ethBlockchain := NewEthBlockchain(t, 1000, 1*time.Second)
+	key, err := ecdsa.GenerateKey(crypto.S256(), NewRepeatByteReader(5))
+	require.NoError(t, err)
+
+	ethBlockchain := NewEthBlockchain(t, 1000, 1*time.Second, key)
 	rageP2PNetwork := NewFakeRageP2PNetwork(ctx, t, 1000)
 	capabilitiesRegistry := NewCapabilitiesRegistry(ctx, t, ethBlockchain)
 
 	servicetest.Run(t, rageP2PNetwork)
 	servicetest.Run(t, ethBlockchain)
-	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry}
+	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry,
+		moduleStoreFactory: NewNoStoreModuleStoreFactory()}
 }
 
-func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, syncerFetcherFunc syncer.FetcherFunc,
-	computeFetcherFactory compute.FetcherFactory) DonContext {
+func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, artifactsFetcherFunc artifacts.FetcherFunc,
+	computeFetcherFactory compute.FetcherFactory, moduleStoreFactory SerialisedModuleStoreFactory) DonContext {
 	donContext := CreateDonContext(ctx, t)
 	workflowRegistry := NewWorkflowRegistry(ctx, t, donContext.EthBlockchain)
 	donContext.workflowRegistry = workflowRegistry
-	donContext.syncerFetcherFunc = syncerFetcherFunc
+	donContext.artifactsFetcherFunc = artifactsFetcherFunc
 	donContext.computeFetcherFactory = computeFetcherFactory
+	donContext.moduleStoreFactory = moduleStoreFactory
 	return donContext
 }
 
@@ -165,6 +189,9 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 			newOracleFactoryFn = factory.NewOracleFactory
 		}
 
+		moduleStore, err := donContext.moduleStoreFactory.GetModuleStoreForPeer(member.String())
+		require.NoError(t, err)
+
 		cn.start = func() {
 			node := startNewNode(ctx, t, lggr.Named(donConfig.name+"-"+strconv.Itoa(i)), nodeInfo, donContext.EthBlockchain,
 				donContext.capabilityRegistry.getAddress(), dispatcher,
@@ -173,7 +200,7 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 					for _, modifier := range don.nodeConfigModifiers {
 						modifier(c, cn)
 					}
-				}, donContext.syncerFetcherFunc, donContext.computeFetcherFactory)
+				}, donContext.artifactsFetcherFunc, donContext.computeFetcherFactory, moduleStore)
 
 			require.NoError(t, node.Start(testutils.Context(t)))
 			cn.TestApplication = node
@@ -196,6 +223,7 @@ func (d *DON) Initialise() {
 		d.nodeConfigModifiers = append(d.nodeConfigModifiers, func(c *chainlink.Config, node *capabilityNode) {
 			workflowRegistryAddressStr := d.workflowRegistry.addr.String()
 			c.Capabilities.WorkflowRegistry.Address = &workflowRegistryAddressStr
+			c.Capabilities.WorkflowRegistry.ChainID = ptr(fmt.Sprintf("%d", testutils.SimulatedChainID))
 		})
 	}
 	d.initialised = true
@@ -411,8 +439,9 @@ func startNewNode(ctx context.Context,
 	newOracleFactoryFn standardcapabilities.NewOracleFactoryFn,
 	keyV2 ethkey.KeyV2,
 	setupCfg func(c *chainlink.Config),
-	fetcherFunc syncer.FetcherFunc,
+	fetcherFunc artifacts.FetcherFunc,
 	fetcherFactoryFunc compute.FetcherFactory,
+	moduleStore artifacts.SerialisedModuleStore,
 ) *cltest.TestApplication {
 	config, _ := heavyweight.FullTestDBV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Capabilities.ExternalRegistry.ChainID = ptr(fmt.Sprintf("%d", testutils.SimulatedChainID))
@@ -442,7 +471,8 @@ func startNewNode(ctx context.Context,
 	ethBlockchain.Commit()
 
 	return cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, ethBlockchain.Backend, nodeInfo,
-		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc, fetcherFactoryFunc)
+		dispatcher, peerWrapper, newOracleFactoryFn, localCapabilities, keyV2, lggr, fetcherFunc, fetcherFactoryFunc,
+		moduleStore)
 }
 
 // Functions below this point are for adding non-standard capabilities to a DON, deliberately verbose. Eventually these

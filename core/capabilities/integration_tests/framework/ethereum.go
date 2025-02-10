@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"os"
 	"sync"
 	"testing"
@@ -31,8 +32,8 @@ type EthBlockchain struct {
 	wg     sync.WaitGroup
 }
 
-func NewEthBlockchain(t *testing.T, initialEth int, blockTimeProcessingTime time.Duration) *EthBlockchain {
-	transactOpts := testutils.MustNewSimTransactor(t) // config contract deployer and owner
+func NewEthBlockchain(t *testing.T, initialEth int, blockTimeProcessingTime time.Duration, key *ecdsa.PrivateKey) *EthBlockchain {
+	transactOpts := testutils.MustNewSimTransactorWithKey(t, key) // config contract deployer and owner
 	genesisData := types.GenesisAlloc{transactOpts.From: {Balance: assets.Ether(initialEth).ToInt()}}
 	backend := cltest.NewSimulatedBackend(t, genesisData, ethconfig.Defaults.Miner.GasCeil)
 	gethlog.SetDefault(gethlog.NewLogger(gethlog.NewTerminalHandlerWithLevel(os.Stderr, gethlog.LevelWarn, true)))

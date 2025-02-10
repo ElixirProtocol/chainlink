@@ -37,14 +37,13 @@ import (
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
-	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-framework/multinode"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/artifacts"
 
 	"github.com/smartcontractkit/chainlink-integrations/evm/assets"
 	evmclient "github.com/smartcontractkit/chainlink-integrations/evm/client"
@@ -359,10 +358,18 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		}
 	}
 
-	var syncerFetcherFunc syncer.FetcherFunc
+	var artifactsFetcherFunc artifacts.FetcherFunc
 	for _, dep := range flagsAndDeps {
-		syncerFetcherFunc, _ = dep.(syncer.FetcherFunc)
-		if syncerFetcherFunc != nil {
+		artifactsFetcherFunc, _ = dep.(artifacts.FetcherFunc)
+		if artifactsFetcherFunc != nil {
+			break
+		}
+	}
+
+	var moduleStore artifacts.SerialisedModuleStore
+	for _, dep := range flagsAndDeps {
+		moduleStore, _ = dep.(artifacts.SerialisedModuleStore)
+		if moduleStore != nil {
 			break
 		}
 	}
@@ -507,8 +514,9 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		CapabilitiesDispatcher:     dispatcher,
 		CapabilitiesPeerWrapper:    peerWrapper,
 		NewOracleFactoryFn:         newOracleFactoryFn,
-		FetcherFunc:                syncerFetcherFunc,
+		FetcherFunc:                artifactsFetcherFunc,
 		FetcherFactoryFn:           computeFetcherFactory,
+		ModuleStore:                moduleStore,
 		RetirementReportCache:      retirementReportCache,
 		LLOTransmissionReaper:      llo.NewTransmissionReaper(ds, lggr, cfg.Mercury().Transmitter().ReaperFrequency().Duration(), cfg.Mercury().Transmitter().ReaperMaxAge().Duration()),
 	})

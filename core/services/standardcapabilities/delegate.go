@@ -50,6 +50,7 @@ type Delegate struct {
 	peerWrapper             *ocrcommon.SingletonPeerWrapper
 	newOracleFactoryFn      NewOracleFactoryFn
 	computeFetcherFactoryFn compute.FetcherFactory
+	wasmBinaryStore         compute.WasmBinaryStore
 
 	isNewlyCreatedJob bool
 }
@@ -76,6 +77,7 @@ func NewDelegate(
 	peerWrapper *ocrcommon.SingletonPeerWrapper,
 	newOracleFactoryFn NewOracleFactoryFn,
 	fetcherFactoryFn compute.FetcherFactory,
+	wasmBinaryStore compute.WasmBinaryStore,
 ) *Delegate {
 	return &Delegate{
 		logger:                  logger,
@@ -92,6 +94,7 @@ func NewDelegate(
 		peerWrapper:             peerWrapper,
 		newOracleFactoryFn:      newOracleFactoryFn,
 		computeFetcherFactoryFn: fetcherFactoryFn,
+		wasmBinaryStore:         wasmBinaryStore,
 	}
 }
 
@@ -270,7 +273,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 			return nil, errors.New("config is empty")
 		}
 
-		computeSrvc, err := compute.NewAction(cfg, log, d.registry, fetcherFactoryFn)
+		computeSrvc, err := compute.NewAction(cfg, log, d.registry, fetcherFactoryFn, d.wasmBinaryStore)
 		if err != nil {
 			return nil, err
 		}

@@ -75,6 +75,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/vrf"
 	"github.com/smartcontractkit/chainlink/v2/core/services/webhook"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows"
+	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/artifacts"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/ratelimiter"
 	workflowstore "github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer"
@@ -198,8 +199,9 @@ type ApplicationOpts struct {
 	CapabilitiesDispatcher     remotetypes.Dispatcher
 	CapabilitiesPeerWrapper    p2ptypes.PeerWrapper
 	NewOracleFactoryFn         standardcapabilities.NewOracleFactoryFn
-	FetcherFunc                syncer.FetcherFunc
+	FetcherFunc                artifacts.FetcherFunc
 	FetcherFactoryFn           compute.FetcherFactory
+	ModuleStore                artifacts.SerialisedModuleStore
 }
 
 type Heartbeat struct {
@@ -304,6 +306,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 	}
 
 	var externalPeerWrapper p2ptypes.PeerWrapper
+	var computeWasmBinaryStore compute.WasmBinaryStore
 	if cfg.Capabilities().Peering().Enabled() {
 		var dispatcher remotetypes.Dispatcher
 		if opts.CapabilitiesDispatcher == nil {
@@ -362,7 +365,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 
 			if cfg.Capabilities().WorkflowRegistry().Address() != "" {
 				lggr := globalLogger.Named("WorkflowRegistrySyncer")
-				var fetcherFunc syncer.FetcherFunc
+				var fetcherFunc artifacts.FetcherFunc
 				if opts.FetcherFunc == nil {
 					if gatewayConnectorWrapper == nil {
 						return nil, errors.New("unable to create workflow registry syncer without gateway connector")
@@ -387,23 +390,34 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 					return nil, fmt.Errorf("expected 1 key, got %d", len(keys))
 				}
 
-				eventHandler := syncer.NewEventHandler(
-					lggr,
-					syncer.NewWorkflowRegistryDS(opts.DS, globalLogger),
+				var moduleStore artifacts.SerialisedModuleStore
+				if opts.ModuleStore != nil {
+					moduleStore = opts.ModuleStore
+				} else {
+					moduleStore, err = artifacts.NewFileBasedModuleStore(cfg.RootDir())
+					if err != nil {
+						return nil, fmt.Errorf("could not create module store: %w", err)
+					}
+				}
+
+				artifactsStore := artifacts.NewStore(lggr, artifacts.NewWorkflowRegistryDS(opts.DS, globalLogger), moduleStore,
 					fetcherFunc,
-					workflowstore.NewDBStore(opts.DS, lggr, clockwork.NewRealClock()),
-					opts.CapabilitiesRegistry,
-					custmsg.NewLabeler(),
-					clockwork.NewRealClock(),
-					keys[0],
-					workflowRateLimiter,
-					syncer.WithMaxArtifactSize(
-						syncer.ArtifactConfig{
+					clockwork.NewRealClock(), keys[0], custmsg.NewLabeler(), artifacts.WithMaxArtifactSize(
+						artifacts.ArtifactConfig{
 							MaxBinarySize:  uint64(cfg.Capabilities().WorkflowRegistry().MaxBinarySize()),
 							MaxSecretsSize: uint64(cfg.Capabilities().WorkflowRegistry().MaxEncryptedSecretsSize()),
 							MaxConfigSize:  uint64(cfg.Capabilities().WorkflowRegistry().MaxConfigSize()),
 						},
-					),
+					))
+				computeWasmBinaryStore = artifactsStore
+
+				eventHandler := syncer.NewEventHandler(
+					lggr,
+					workflowstore.NewDBStore(opts.DS, lggr, clockwork.NewRealClock()),
+					opts.CapabilitiesRegistry,
+					custmsg.NewLabeler(),
+					workflowRateLimiter,
+					artifactsStore,
 				)
 
 				globalLogger.Debugw("Creating WorkflowRegistrySyncer")
@@ -673,6 +687,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		peerWrapper,
 		opts.NewOracleFactoryFn,
 		opts.FetcherFactoryFn,
+		computeWasmBinaryStore,
 	)
 
 	if cfg.OCR().Enabled() {

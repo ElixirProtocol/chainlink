@@ -58,6 +58,12 @@ func MustNewSimTransactor(t testing.TB) *bind.TransactOpts {
 	return transactor
 }
 
+func MustNewSimTransactorWithKey(t testing.TB, key *ecdsa.PrivateKey) *bind.TransactOpts {
+	transactor, err := bind.NewKeyedTransactorWithChainID(key, SimulatedChainID)
+	require.NoError(t, err)
+	return transactor
+}
+
 // NewAddress return a random new address
 func NewAddress() common.Address {
 	return common.BytesToAddress(randomBytes(20))

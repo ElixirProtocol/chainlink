@@ -49,12 +49,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 		return nil, err
 	}
 
-	binary, err := spec.WorkflowSpec.RawSpec(ctx)
-	if err != nil {
-		logCustMsg(ctx, cma, fmt.Sprintf("failed to start workflow engine: failed to fetch workflow spec binary: %v", err), d.logger)
-		return nil, err
-	}
-
 	config, err := spec.WorkflowSpec.GetConfig(ctx)
 	if err != nil {
 		logCustMsg(ctx, cma, fmt.Sprintf("failed to start workflow engine: failed to get workflow spec config: %v", err), d.logger)
@@ -72,7 +66,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 		Registry:       d.registry,
 		Store:          d.store,
 		Config:         config,
-		Binary:         binary,
 		SecretsFetcher: d.secretsFetcher,
 		RateLimiter:    d.ratelimiter,
 	}
@@ -84,14 +77,8 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 	return []job.ServiceCtx{engine}, nil
 }
 
-type noopSecretsFetcher struct{}
-
-func (n *noopSecretsFetcher) SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error) {
+func SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error) {
 	return map[string]string{}, nil
-}
-
-func newNoopSecretsFetcher() *noopSecretsFetcher {
-	return &noopSecretsFetcher{}
 }
 
 func NewDelegate(
@@ -103,7 +90,7 @@ func NewDelegate(
 	return &Delegate{
 		logger:         logger,
 		registry:       registry,
-		secretsFetcher: newNoopSecretsFetcher(),
+		secretsFetcher: SecretsFor,
 		store:          store,
 		ratelimiter:    ratelimiter,
 	}

@@ -2,7 +2,6 @@ package compute
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,7 +34,6 @@ import (
 const (
 	CapabilityIDCompute = "custom-compute@1.0.0"
 
-	binaryKey       = "binary"
 	configKey       = "config"
 	maxMemoryMBsKey = "maxMemoryMBs"
 	timeoutKey      = "timeout"
@@ -75,6 +73,11 @@ var (
 
 var _ capabilities.ActionCapability = (*Compute)(nil)
 
+type WasmBinaryStore interface {
+	host.WasmBinaryStore
+	GetWasmBinaryID(workflowID string) (string, bool, error)
+}
+
 type FetcherFn func(ctx context.Context, req *wasmpb.FetchRequest) (*wasmpb.FetchResponse, error)
 
 type FetcherFactory interface {
@@ -96,6 +99,8 @@ type Compute struct {
 
 	fetcherFactory FetcherFactory
 
+	wasmBinaryStore WasmBinaryStore
+
 	numWorkers int
 	queue      chan request
 	wg         sync.WaitGroup
@@ -107,11 +112,6 @@ func (c *Compute) RegisterToWorkflow(ctx context.Context, request capabilities.R
 
 func (c *Compute) UnregisterFromWorkflow(ctx context.Context, request capabilities.UnregisterFromWorkflowRequest) error {
 	return nil
-}
-
-func generateID(binary []byte) string {
-	id := sha256.Sum256(binary)
-	return fmt.Sprintf("%x", id)
 }
 
 func (c *Compute) Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error) {
@@ -165,11 +165,21 @@ func (c *Compute) execute(ctx context.Context, respCh chan response, req capabil
 		return
 	}
 
-	id := generateID(cfg.Binary)
+	workflowID := req.Metadata.WorkflowID
+	binaryID, exists, err := c.wasmBinaryStore.GetWasmBinaryID(req.Metadata.WorkflowID)
+	if err != nil {
+		respCh <- response{err: fmt.Errorf("could not get wasm binary ID: %w", err)}
+		return
+	}
 
-	m, ok := c.modules.get(id)
+	if !exists {
+		respCh <- response{err: fmt.Errorf("no wasm binary found for workflow ID %s", workflowID)}
+		return
+	}
+
+	m, ok := c.modules.get(binaryID)
 	if !ok {
-		mod, innerErr := c.initModule(id, cfg.ModuleConfig, cfg.Binary, copiedReq.Metadata)
+		mod, innerErr := c.initModule(ctx, workflowID, cfg.ModuleConfig, binaryID, copiedReq.Metadata)
 		if innerErr != nil {
 			respCh <- response{err: innerErr}
 			return
@@ -186,12 +196,12 @@ func (c *Compute) execute(ctx context.Context, respCh chan response, req capabil
 	}
 }
 
-func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binary []byte, requestMetadata capabilities.RequestMetadata) (*module, error) {
+func (c *Compute) initModule(ctx context.Context, workflowID string, cfg *host.ModuleConfig, binaryID string, requestMetadata capabilities.RequestMetadata) (*module, error) {
 	initStart := time.Now()
 
 	cfg.Fetch = c.fetcherFactory.NewFetcher(c.log, c.emitter)
 
-	mod, err := host.NewModule(cfg, binary)
+	mod, err := host.NewModule(ctx, c.log, cfg, workflowID, c.wasmBinaryStore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate WASM module: %w", err)
 	}
@@ -202,7 +212,7 @@ func (c *Compute) initModule(id string, cfg *host.ModuleConfig, binary []byte, r
 	computeWASMInit.WithLabelValues(requestMetadata.WorkflowID, requestMetadata.ReferenceID).Observe(float64(initDuration))
 
 	m := &module{module: mod}
-	err = c.modules.add(id, m)
+	err = c.modules.add(binaryID, m)
 	if err != nil {
 		c.log.Warnf("failed to add module to cache: %s", err.Error())
 	}
@@ -433,6 +443,7 @@ func NewAction(
 	log logger.Logger,
 	registry coretypes.CapabilitiesRegistry,
 	fetcherFactory FetcherFactory,
+	wasmBinaryStore WasmBinaryStore,
 	opts ...func(*Compute),
 ) (*Compute, error) {
 	config.ApplyDefaults()
@@ -441,15 +452,16 @@ func NewAction(
 		lggr    = logger.Named(log, "CustomCompute")
 		labeler = custmsg.NewLabeler()
 		compute = &Compute{
-			stopCh:         make(services.StopChan),
-			log:            lggr,
-			emitter:        labeler,
-			registry:       registry,
-			modules:        newModuleCache(clockwork.NewRealClock(), 1*time.Minute, 10*time.Minute, 3),
-			transformer:    NewTransformer(lggr, labeler, config),
-			fetcherFactory: fetcherFactory,
-			queue:          make(chan request),
-			numWorkers:     config.NumWorkers,
+			stopCh:          make(services.StopChan),
+			log:             lggr,
+			emitter:         labeler,
+			registry:        registry,
+			modules:         newModuleCache(clockwork.NewRealClock(), 1*time.Minute, 100*time.Minute, 300),
+			transformer:     NewTransformer(lggr, labeler, config),
+			fetcherFactory:  fetcherFactory,
+			wasmBinaryStore: wasmBinaryStore,
+			queue:           make(chan request),
+			numWorkers:      config.NumWorkers,
 		}
 	)
 

@@ -2,8 +2,11 @@ package workflows
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -157,12 +160,6 @@ func newTestEngineWithYAMLSpec(t *testing.T, reg *coreCap.Registry, spec string,
 	return newTestEngine(t, reg, sdkSpec, opts...)
 }
 
-type mockSecretsFetcher struct{}
-
-func (s mockSecretsFetcher) SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error) {
-	return map[string]string{}, nil
-}
-
 // newTestEngine creates a new engine with some test defaults.
 func newTestEngine(t *testing.T, reg *coreCap.Registry, sdkSpec sdk.WorkflowSpec, opts ...func(c *Config)) (*Engine, *testHooks) {
 	initFailed := make(chan struct{})
@@ -203,9 +200,11 @@ func newTestEngine(t *testing.T, reg *coreCap.Registry, sdkSpec sdk.WorkflowSpec
 		onRateLimit: func(weid string) {
 			rateLimited <- weid
 		},
-		SecretsFetcher: mockSecretsFetcher{},
-		clock:          clock,
-		RateLimiter:    rl,
+		SecretsFetcher: func(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error) {
+			return nil, nil
+		},
+		clock:       clock,
+		RateLimiter: rl,
 	}
 	for _, o := range opts {
 		o(&cfg)
@@ -1597,7 +1596,12 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 	idGeneratorFn := func() string { return "validRequestID" }
 	fetcher, err := compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn)
 	require.NoError(t, err)
-	compute, err := compute.NewAction(cfg, log, reg, fetcher)
+	binaryB := wasmtest.CreateTestBinary(cmd, binary, true, t)
+
+	fakeWasmBinaryStore := NewFakeComputeWasmStore()
+	fakeWasmBinaryStore.AddWasmBinary(testWorkflowID, binaryB)
+
+	compute, err := compute.NewAction(cfg, log, reg, fetcher, fakeWasmBinaryStore)
 	require.NoError(t, err)
 	require.NoError(t, compute.Start(ctx))
 	defer compute.Close()
@@ -1605,12 +1609,11 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 	trigger := basicTestTrigger(t)
 	require.NoError(t, reg.Add(ctx, trigger))
 
-	binaryB := wasmtest.CreateTestBinary(cmd, binary, true, t)
-
 	spec, err := host.GetWorkflowSpec(
-		ctx,
+		ctx, log,
 		&host.ModuleConfig{Logger: log},
-		binaryB,
+		testWorkflowID,
+		fakeWasmBinaryStore,
 		nil, // config
 	)
 	require.NoError(t, err)
@@ -1619,7 +1622,6 @@ func TestEngine_WithCustomComputeStep(t *testing.T) {
 		reg,
 		*spec,
 		func(c *Config) {
-			c.Binary = binaryB
 			c.Config = nil
 		},
 	)
@@ -1666,7 +1668,12 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 	idGeneratorFn := func() string { return "validRequestID" }
 	fetcher, err := compute.NewOutgoingConnectorFetcherFactory(handler, idGeneratorFn)
 	require.NoError(t, err)
-	compute, err := compute.NewAction(cfg, log, reg, fetcher)
+	binaryB := wasmtest.CreateTestBinary(cmd, binary, true, t)
+
+	fakeWasmBinaryStore := NewFakeComputeWasmStore()
+	fakeWasmBinaryStore.AddWasmBinary(testWorkflowID, binaryB)
+
+	compute, err := compute.NewAction(cfg, log, reg, fetcher, fakeWasmBinaryStore)
 	require.NoError(t, err)
 	require.NoError(t, compute.Start(ctx))
 	defer compute.Close()
@@ -1674,12 +1681,11 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 	trigger := basicTestTrigger(t)
 	require.NoError(t, reg.Add(ctx, trigger))
 
-	binaryB := wasmtest.CreateTestBinary(cmd, binary, true, t)
-
 	spec, err := host.GetWorkflowSpec(
-		ctx,
+		ctx, log,
 		&host.ModuleConfig{Logger: log},
-		binaryB,
+		testWorkflowID,
+		fakeWasmBinaryStore,
 		nil, // config
 	)
 	require.NoError(t, err)
@@ -1688,7 +1694,6 @@ func TestEngine_CustomComputePropagatesBreaks(t *testing.T) {
 		reg,
 		*spec,
 		func(c *Config) {
-			c.Binary = binaryB
 			c.Config = nil
 		},
 	)
@@ -1800,10 +1805,11 @@ func TestEngine_FetchesSecrets(t *testing.T) {
 			reg,
 			secretsWorkflow,
 			func(c *Config) {
-				c.SecretsFetcher = &mockFetcher{
-					retval: map[string]string{
+				c.SecretsFetcher = func(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName,
+					workflowID string) (map[string]string, error) {
+					return map[string]string{
 						"fidelity": "aFidelitySecret",
-					},
+					}, nil
 				}
 			},
 		)
@@ -1860,9 +1866,9 @@ func TestEngine_CloseHappensOnlyIfWorkflowHasBeenRegistered(t *testing.T) {
 		reg,
 		secretsWorkflow,
 		func(c *Config) {
-			c.SecretsFetcher = &mockFetcher{
-				retval: map[string]string{},
-				retErr: errors.New("failed to fetch secrets XXX"),
+			c.SecretsFetcher = func(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName,
+				workflowID string) (map[string]string, error) {
+				return map[string]string{}, errors.New("failed to fetch secrets XXX")
 			}
 		},
 	)
@@ -1957,4 +1963,51 @@ func TestMerge(t *testing.T) {
 			assert.Equal(t, tc.expectedConfig, gotMap)
 		})
 	}
+}
+
+type FakeComputeWasmStore struct {
+	binaries map[string][]byte
+	mu       sync.Mutex
+}
+
+func NewFakeComputeWasmStore() *FakeComputeWasmStore {
+	return &FakeComputeWasmStore{
+		binaries: make(map[string][]byte),
+	}
+}
+
+func (s *FakeComputeWasmStore) GetSerialisedModulePath(workflowID string) (string, bool, error) {
+	return "", false, nil
+}
+
+func (s *FakeComputeWasmStore) StoreSerialisedModule(workflowID string, binaryID string, serialisedModule []byte) error {
+	return nil
+}
+
+func (s *FakeComputeWasmStore) AddWasmBinary(workflowID string, binary []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.binaries[workflowID] = binary
+}
+
+func (s *FakeComputeWasmStore) GetWasmBinary(ctx context.Context, workflowID string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	binary, exists := s.binaries[workflowID]
+	if !exists {
+		return nil, fmt.Errorf("binary not found for workflow ID: %s", workflowID)
+	}
+	return binary, nil
+}
+
+func (s *FakeComputeWasmStore) GetWasmBinaryID(workflowID string) (string, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	binary, exists := s.binaries[workflowID]
+	if !exists {
+		return "", false, fmt.Errorf("binary id not found for workflow ID: %s", workflowID)
+	}
+	hash := sha256.Sum256(binary)
+	binaryID := hex.EncodeToString(hash[:])
+	return binaryID, true, nil
 }

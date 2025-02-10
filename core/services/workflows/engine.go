@@ -96,9 +96,7 @@ func (sucm *stepUpdateManager) len() int64 {
 	return int64(len(sucm.m))
 }
 
-type secretsFetcher interface {
-	SecretsFor(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error)
-}
+type secretsFetcher func(ctx context.Context, workflowOwner, hexWorkflowName, decodedWorkflowName, workflowID string) (map[string]string, error)
 
 // Engine handles the lifecycle of a single workflow and its executions.
 type Engine struct {
@@ -914,7 +912,7 @@ func (e *Engine) interpolateEnvVars(config map[string]any, env exec.Env) (*value
 // registry (for capability-level configuration). It doesn't perform any caching of the config values, since
 // the two registries perform their own caching.
 func (e *Engine) configForStep(ctx context.Context, lggr logger.Logger, step *step) (*values.Map, error) {
-	secrets, err := e.secretsFetcher.SecretsFor(ctx, e.workflow.owner, e.workflow.name.Hex(), e.workflow.name.String(), e.workflow.id)
+	secrets, err := e.secretsFetcher(ctx, e.workflow.owner, e.workflow.name.Hex(), e.workflow.name.String(), e.workflow.id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch secrets: %w", err)
 	}
@@ -1246,7 +1244,6 @@ type Config struct {
 	MaxExecutionDuration time.Duration
 	Store                store.Store
 	Config               []byte
-	Binary               []byte
 	SecretsFetcher       secretsFetcher
 	HeartbeatCadence     time.Duration
 	StepTimeout          time.Duration
@@ -1263,7 +1260,7 @@ type Config struct {
 
 const (
 	defaultWorkerLimit          = 100
-	defaultQueueSize            = 100000
+	defaultQueueSize            = 1000
 	defaultNewWorkerTimeout     = 2 * time.Second
 	defaultMaxExecutionDuration = 10 * time.Minute
 	defaultHeartbeatCadence     = 5 * time.Minute
@@ -1365,7 +1362,6 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 		secretsFetcher: cfg.SecretsFetcher,
 		env: exec.Env{
 			Config: cfg.Config,
-			Binary: cfg.Binary,
 		},
 		executionStates:      cfg.Store,
 		pendingStepRequests:  make(chan stepRequest, cfg.QueueSize),
