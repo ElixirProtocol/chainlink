@@ -534,7 +534,7 @@ func testRunningWorkflow(t *testing.T, tc testCase) {
 		moduleStore := NewFakeModuleStore()
 
 		s := artifacts.NewStore(lggr, orm, moduleStore, fetcher, clockwork.NewFakeClock(), workflowkey.Key{}, emitter)
-		h := NewEventHandler(lggr, store, registry, emitter, rl, s)
+		h := NewEventHandler(lggr, store, registry, emitter, rl, s, opts...)
 
 		tc.validationFn(t, ctx, event, h, s, wfOwner, "workflow-name", wfID)
 	})
