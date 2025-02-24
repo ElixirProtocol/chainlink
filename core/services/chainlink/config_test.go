@@ -97,6 +97,7 @@ var (
 			AutoPprof: toml.AutoPprof{
 				CPUProfileRate: ptr[int64](7),
 			},
+			Wasm: toml.Wasm{SerialisedModulesDir: ptr("test/root/dir")},
 		},
 		EVM: []*evmcfg.EVMConfig{
 			{
@@ -549,6 +550,7 @@ func TestConfig_Marshal(t *testing.T) {
 		EmitterBatchProcessor: ptr(true),
 		EmitterExportTimeout:  commoncfg.MustNewDuration(1 * time.Second),
 	}
+	full.Wasm = toml.Wasm{SerialisedModulesDir: ptr("test/root/dir")}
 	full.EVM = []*evmcfg.EVMConfig{
 		{
 			ChainID: ubig.NewI(1),

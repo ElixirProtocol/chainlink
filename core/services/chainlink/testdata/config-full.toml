@@ -322,6 +322,9 @@ EmitterExportTimeout = '1s'
 Baz = 'test'
 Foo = 'bar'
 
+[Wasm]
+SerialisedModulesDir = 'test/root/dir'
+
 [[EVM]]
 ChainID = '1'
 Enabled = false

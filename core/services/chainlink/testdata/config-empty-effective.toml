@@ -307,3 +307,6 @@ InsecureConnection = false
 TraceSampleRatio = 0.01
 EmitterBatchProcessor = true
 EmitterExportTimeout = '1s'
+
+[Wasm]
+SerialisedModulesDir = ''

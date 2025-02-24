@@ -35,6 +35,9 @@ GasPriceBufferPercent = 10
 [AutoPprof]
 CPUProfileRate = 7
 
+[Wasm]
+SerialisedModulesDir = 'test/root/dir'
+
 [[EVM]]
 ChainID = '1'
 FinalityDepth = 26

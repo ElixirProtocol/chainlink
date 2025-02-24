@@ -27,8 +27,6 @@ import (
 	configutils "github.com/smartcontractkit/chainlink/v2/core/utils/config"
 )
 
-var ErrUnsupported = errors.New("unsupported with config v2")
-
 // Core holds the core configuration. See chainlink.Config for more information.
 type Core struct {
 	// General/misc
@@ -57,7 +55,10 @@ type Core struct {
 	Mercury          Mercury          `toml:",omitempty"`
 	Capabilities     Capabilities     `toml:",omitempty"`
 	Telemetry        Telemetry        `toml:",omitempty"`
+	Wasm             Wasm             `toml:",omitempty"`
 }
+
+var ErrUnsupported = errors.New("unsupported with config v2")
 
 // SetFrom updates c with any non-nil values from f. (currently TOML field only!)
 func (c *Core) SetFrom(f *Core) {
@@ -94,6 +95,7 @@ func (c *Core) SetFrom(f *Core) {
 	c.Insecure.setFrom(&f.Insecure)
 	c.Tracing.setFrom(&f.Tracing)
 	c.Telemetry.setFrom(&f.Telemetry)
+	c.Wasm.setFrom(&f.Wasm)
 }
 
 func (c *Core) ValidateConfig() (err error) {
@@ -1732,6 +1734,22 @@ func (t *Tracing) ValidateConfig() (err error) {
 	}
 
 	return err
+}
+
+type Wasm struct {
+	SerialisedModulesDir *string
+}
+
+func (w *Wasm) setFrom(f *Wasm) {
+	if v := f.SerialisedModulesDir; v != nil {
+		w.SerialisedModulesDir = v
+	}
+}
+
+func (w *Wasm) SetDefaults(rootDir *string) {
+	if w.SerialisedModulesDir == nil {
+		w.SerialisedModulesDir = rootDir
+	}
 }
 
 type Telemetry struct {

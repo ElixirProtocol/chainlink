@@ -308,6 +308,9 @@ TraceSampleRatio = 0.01
 EmitterBatchProcessor = true
 EmitterExportTimeout = '1s'
 
+[Wasm]
+SerialisedModulesDir = 'test/root/dir'
+
 [[EVM]]
 ChainID = '1'
 AutoCreateKey = true

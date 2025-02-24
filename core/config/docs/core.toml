@@ -757,3 +757,8 @@ EmitterExportTimeout = '1s' # Default
 [Telemetry.ResourceAttributes]
 # foo is an example resource attribute
 foo = "bar" # Example
+
+# Wasm holds settings for the WebAssembly runtime.
+[Wasm]
+# SerialisedModulesDir is the directory where the serialised Wasm modules are stored
+SerialisedModulesDir = '/path/to/serialised/modules' # Example
