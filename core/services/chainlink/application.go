@@ -394,12 +394,12 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 				if opts.ModuleStore != nil {
 					moduleStore = opts.ModuleStore
 				} else {
-					wasmDir := cfg.Wasm().SerialisedModulesDir()
-					if wasmDir == "" {
-						wasmDir = cfg.RootDir()
+					serialisedModulesDir := cfg.Wasm().SerialisedModulesDir()
+					if serialisedModulesDir == "" {
+						serialisedModulesDir = cfg.RootDir()
 					}
 
-					moduleStore, err = artifacts.NewFileBasedModuleStore(wasmDir)
+					moduleStore, err = artifacts.NewFileBasedModuleStore(serialisedModulesDir)
 					if err != nil {
 						return nil, fmt.Errorf("could not create module store: %w", err)
 					}
