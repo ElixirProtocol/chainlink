@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipaptos"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsolana"
 	"golang.org/x/exp/maps"
@@ -230,6 +231,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 				common.NewAddressCodecParams(
 					ccipevm.AddressCodec{},
 					ccipsolana.AddressCodec{},
+					ccipaptos.AddressCodec{},
 				)),
 		)
 	} else {
