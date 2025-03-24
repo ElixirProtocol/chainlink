@@ -1,10 +1,8 @@
 package aptos
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/aptos-labs/aptos-go-sdk"
 
@@ -14,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/bindings/compile"
 	mcmsbind "github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
 	"github.com/smartcontractkit/mcms"
 	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
 	"github.com/smartcontractkit/mcms/types"
@@ -112,7 +111,7 @@ func (cs *CsDeployAptosChainImp) generateCleanupStagingProposal(chainSel uint64)
 	aptosChain := cs.env.AptosChains[chainSel]
 
 	// Check resources first to see if staging is clean
-	IsMCMSStagingAreaClean, err := IsMCMSStagingAreaClean(aptosChain.Client, chainState.MCMSAddress)
+	IsMCMSStagingAreaClean, err := utils.IsMCMSStagingAreaClean(aptosChain.Client, chainState.MCMSAddress)
 	if err != nil {
 		return fmt.Errorf("failed to check if MCMS staging area is clean: %w", err)
 	}
@@ -149,7 +148,8 @@ func (cs *CsDeployAptosChainImp) generateCleanupStagingProposal(chainSel uint64)
 	})
 
 	// Generate cleanup proposal
-	proposal, err := cs.generateDeployProposal(mcmsContract, chainSel, operations, "Cleanup Staging Area")
+	proposal, nextOpCount, err := utils.GenerateProposal(aptosChain.Client, mcmsContract, chainSel, operations, "Cleanup Staging Area", cs.opCount)
+	cs.opCount = nextOpCount
 	if err != nil {
 		return fmt.Errorf("failed to create deploy proposal: %w", err)
 	}
@@ -181,7 +181,8 @@ func (cs *CsDeployAptosChainImp) generateDeployCCIPProposal(chainSel uint64) (*a
 	cs.ab.Save(chainSel, ccipObjectAddress.String(), typeAndVersion)
 
 	// Generate deploy proposal
-	proposal, err := cs.generateDeployProposal(mcmsContract, chainSel, operations, "Deploy CCIP Package")
+	proposal, nextOpCount, err := utils.GenerateProposal(aptosChain.Client, mcmsContract, chainSel, operations, "Deploy CCIP Package", cs.opCount)
+	cs.opCount = nextOpCount
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deploy proposal: %w", err)
 	}
@@ -227,7 +228,8 @@ func (cs *CsDeployAptosChainImp) generateDeployRouterProposal(chainSel uint64, c
 	}
 
 	// Generate deploy proposal
-	proposal, err := cs.generateDeployProposal(mcmsContract, chainSel, operations, "Deploy Router Package")
+	proposal, nextOpCount, err := utils.GenerateProposal(aptosChain.Client, mcmsContract, chainSel, operations, "Deploy Router Package", cs.opCount)
+	cs.opCount = nextOpCount
 	if err != nil {
 		return fmt.Errorf("failed to create deploy proposal: %w", err)
 	}
@@ -317,43 +319,4 @@ func createChunksAndStage(
 	}
 
 	return operations, nil
-}
-
-func (cs *CsDeployAptosChainImp) generateDeployProposal(mcmsContract mcmsbind.MCMS, chainSel uint64, operations []types.Operation, description string) (*mcms.Proposal, error) {
-	if cs.opCount == 0 {
-		// Create MCMS inspector
-		inspector := aptosmcms.NewInspector(cs.env.AptosChains[chainSel].Client)
-		startingOpCount, err := inspector.GetOpCount(context.Background(), mcmsContract.Address.StringLong())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get starting op count: %w", err)
-		}
-		cs.opCount = startingOpCount
-	}
-
-	// Create proposal builder
-	validUntil := time.Now().Add(time.Hour * 24).Unix()
-	proposalBuilder := mcms.NewProposalBuilder().
-		SetVersion("v1").
-		SetValidUntil(uint32(validUntil)).
-		SetDescription(description).
-		SetOverridePreviousRoot(true).
-		AddChainMetadata(
-			types.ChainSelector(chainSel),
-			types.ChainMetadata{
-				StartingOpCount: cs.opCount,
-				MCMAddress:      mcmsContract.Address.StringLong(),
-			},
-		)
-
-	// Add operations and build
-	for _, op := range operations {
-		proposalBuilder.AddOperation(op)
-	}
-	proposal, err := proposalBuilder.Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build proposal: %w", err)
-	}
-
-	cs.opCount += uint64(len(operations))
-	return proposal, nil
 }

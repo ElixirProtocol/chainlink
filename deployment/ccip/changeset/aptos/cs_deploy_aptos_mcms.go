@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	mcmsbind "github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
 	"github.com/smartcontractkit/mcms"
 	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -21,8 +22,6 @@ const (
 )
 
 const (
-	ValidUntilHours         = 72
-	MCMSProposalVersion     = "v1"
 	MCMSProposalDescription = "Accept ownership of the contract to self"
 )
 
@@ -98,7 +97,7 @@ func deployMCMSContractsForAptosChain(p *deployAptosMCMSParams) error {
 	if err != nil {
 		return fmt.Errorf("failed to deploy MCMS contract: %v", err)
 	}
-	if err := ConfirmTx(aptosChain, mcmsDeployTx.Hash); err != nil {
+	if err := utils.ConfirmTx(aptosChain, mcmsDeployTx.Hash); err != nil {
 		return fmt.Errorf("failed to confirm MCMS deployment transaction: %v", err)
 	}
 
@@ -111,12 +110,23 @@ func deployMCMSContractsForAptosChain(p *deployAptosMCMSParams) error {
 	if err != nil {
 		return fmt.Errorf("failed to setConfig in MCMS contract: %v", err)
 	}
-	if err := ConfirmTx(aptosChain, setCfgTx.Hash); err != nil {
+	if err := utils.ConfirmTx(aptosChain, setCfgTx.Hash); err != nil {
 		return fmt.Errorf("MCMS setConfig transaction failed: %v", err)
 	}
 
+	// Transfer ownership to self
+	opts := &bind.TransactOpts{Signer: aptosChain.DeployerSigner}
+	tx, err := contractMCMS.MCMSAccount.TransferOwnershipToSelf(opts)
+	if err != nil {
+		return fmt.Errorf("failed to TransferOwnershipToSelf in MCMS contract: %v", err)
+	}
+	_, err = aptosChain.Client.WaitForTransaction(tx.Hash)
+	if err != nil {
+		return fmt.Errorf("MCMS TransferOwnershipToSelf transaction failed: %v", err)
+	}
+
 	// Generate proposal to transfer ownership to self
-	proposal, err := getMCMSProposal(aptosChain, addressMCMS, contractMCMS, p.chainSelector)
+	proposal, err := generateAcceptOwnershipProposal(aptosChain, addressMCMS, contractMCMS, p.chainSelector)
 	if err != nil {
 		return fmt.Errorf("failed to build proposal: %v", err)
 	}
@@ -125,36 +135,14 @@ func deployMCMSContractsForAptosChain(p *deployAptosMCMSParams) error {
 	return nil
 }
 
-func getMCMSProposal(
+func generateAcceptOwnershipProposal(
 	aptosChain deployment.AptosChain,
 	addressMCMS aptos.AccountAddress,
 	contractMCMS mcmsbind.MCMS,
 	chainSelector uint64,
 ) (*mcms.Proposal, error) {
-	opts := &bind.TransactOpts{Signer: aptosChain.DeployerSigner}
-	tx, err := contractMCMS.MCMSAccount.TransferOwnershipToSelf(opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to TransferOwnershipToSelf in MCMS contract: %v", err)
-	}
-	_, err = aptosChain.Client.WaitForTransaction(tx.Hash)
-	if err != nil {
-		return nil, fmt.Errorf("MCMS TransferOwnershipToSelf transaction failed: %v", err)
-	}
-
-	validUntil := time.Now().Add(time.Hour * ValidUntilHours).Unix()
-	proposalBuilder := mcms.NewProposalBuilder().
-		SetVersion(MCMSProposalVersion).
-		SetValidUntil(uint32(validUntil)).
-		SetDescription(MCMSProposalDescription).
-		SetOverridePreviousRoot(true).
-		AddChainMetadata(
-			mcmstypes.ChainSelector(chainSelector),
-			mcmstypes.ChainMetadata{
-				StartingOpCount: 0,
-				MCMAddress:      contractMCMS.Address.StringLong(),
-			},
-		)
-
+	// TODO: getMCMSXXXOperations
+	var operations []mcmstypes.Operation
 	module, function, _, args, err := contractMCMS.MCMSAccount.EncodeAcceptOwnership()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode AcceptOwnership: %v", err)
@@ -168,7 +156,7 @@ func getMCMSProposal(
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal additionalFields: %v", err)
 	}
-	proposalBuilder.AddOperation(mcmstypes.Operation{
+	operations = append(operations, mcmstypes.Operation{
 		ChainSelector: mcmstypes.ChainSelector(chainSelector),
 		Transaction: mcmstypes.Transaction{
 			To:               addressMCMS.StringLong(),
@@ -177,5 +165,7 @@ func getMCMSProposal(
 		},
 	})
 
-	return proposalBuilder.Build()
+	// TODO: this returns opCount and we need to keep track of it
+	proposal, _, err := utils.GenerateProposal(aptosChain.Client, contractMCMS, chainSelector, operations, MCMSProposalDescription, 0)
+	return proposal, err
 }
