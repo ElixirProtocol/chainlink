@@ -61,11 +61,11 @@ func TestLoadOnchainStateAptos(t *testing.T) {
 			},
 			want: map[uint64]AptosCCIPChainState{
 				4457093679053095497: {
-					AptosMCMSObjAddr: mustParseAddress(t, mockMCMSAddress),
+					MCMSAddress: mustParseAddress(t, mockMCMSAddress),
 				},
 				743186221051783445: {
-					AptosMCMSObjAddr: mustParseAddress(t, mockMCMSAddress),
-					AptosCCIPObjAddr: mustParseAddress(t, mockCCIPAddress),
+					MCMSAddress: mustParseAddress(t, mockMCMSAddress),
+					CCIPAddress: mustParseAddress(t, mockCCIPAddress),
 				},
 			},
 			err: nil,

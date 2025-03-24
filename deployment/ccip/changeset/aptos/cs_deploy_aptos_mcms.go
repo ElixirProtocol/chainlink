@@ -87,8 +87,8 @@ func deployMCMSContractsForAptosChain(p *deployAptosMCMSParams) error {
 	}
 
 	// Check if MCMS package is already deployed
-	if (chainState.AptosMCMSObjAddr != aptos.AccountAddress{}) {
-		p.env.Logger.Infow("MCMS Package already deployed", "addr", chainState.AptosMCMSObjAddr.String())
+	if (chainState.MCMSAddress != aptos.AccountAddress{}) {
+		p.env.Logger.Infow("MCMS Package already deployed", "addr", chainState.MCMSAddress.String())
 		return nil
 	}
 

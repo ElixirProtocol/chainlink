@@ -50,7 +50,7 @@ func (cs CsDeployAptosChainImp) VerifyPreconditions(env deployment.Environment, 
 			failedEnvChains = append(failedEnvChains, chainSel)
 		}
 		chainState, ok := state[chainSel]
-		if !ok || chainState.AptosMCMSObjAddr == (aptos.AccountAddress{}) {
+		if !ok || chainState.MCMSAddress == (aptos.AccountAddress{}) {
 			failedPrereqChains = append(failedPrereqChains, chainSel)
 		}
 	}
@@ -112,17 +112,17 @@ func (cs *CsDeployAptosChainImp) generateCleanupStagingProposal(chainSel uint64)
 	aptosChain := cs.env.AptosChains[chainSel]
 
 	// Check resources first to see if staging is clean
-	IsMCMSStagingAreaClean, err := IsMCMSStagingAreaClean(aptosChain.Client, chainState.AptosMCMSObjAddr)
+	IsMCMSStagingAreaClean, err := IsMCMSStagingAreaClean(aptosChain.Client, chainState.MCMSAddress)
 	if err != nil {
 		return fmt.Errorf("failed to check if MCMS staging area is clean: %w", err)
 	}
 	if IsMCMSStagingAreaClean {
-		cs.env.Logger.Infow("MCMS Staging Area already clean", "addr", chainState.AptosMCMSObjAddr.String())
+		cs.env.Logger.Infow("MCMS Staging Area already clean", "addr", chainState.MCMSAddress.String())
 		return nil
 	}
 
 	// Bind MCMS contract
-	mcmsContract := mcmsbind.Bind(chainState.AptosMCMSObjAddr, aptosChain.Client)
+	mcmsContract := mcmsbind.Bind(chainState.MCMSAddress, aptosChain.Client)
 
 	// Get cleanup staging operations
 	var operations []types.Operation
@@ -164,13 +164,13 @@ func (cs *CsDeployAptosChainImp) generateDeployCCIPProposal(chainSel uint64) (*a
 	aptosChain := cs.env.AptosChains[chainSel]
 
 	// Validate there's no package deployed
-	if (chainState.AptosCCIPObjAddr != aptos.AccountAddress{}) {
-		cs.env.Logger.Infow("CCIP Package already deployed", "addr", chainState.AptosCCIPObjAddr.String())
-		return &chainState.AptosCCIPObjAddr, nil
+	if (chainState.CCIPAddress != aptos.AccountAddress{}) {
+		cs.env.Logger.Infow("CCIP Package already deployed", "addr", chainState.CCIPAddress.String())
+		return &chainState.CCIPAddress, nil
 	}
 
 	// Compile, chunk and get CCIP deploy operations
-	mcmsContract := mcmsbind.Bind(chainState.AptosMCMSObjAddr, aptosChain.Client)
+	mcmsContract := mcmsbind.Bind(chainState.MCMSAddress, aptosChain.Client)
 	ccipObjectAddress, operations, err := cs.getCCIPDeployOperations(mcmsContract, chainSel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile and create deploy operations: %w", err)
@@ -220,7 +220,7 @@ func (cs *CsDeployAptosChainImp) generateDeployRouterProposal(chainSel uint64, c
 	// TODO: is there a way to check if module exists?
 
 	// Compile, chunk and get Router deploy operations
-	mcmsContract := mcmsbind.Bind(chainState.AptosMCMSObjAddr, aptosChain.Client)
+	mcmsContract := mcmsbind.Bind(chainState.MCMSAddress, aptosChain.Client)
 	operations, err := cs.getRouterDeployOperations(mcmsContract, chainSel, ccipObjectAddress)
 	if err != nil {
 		return fmt.Errorf("failed to compile and create deploy operations: %w", err)

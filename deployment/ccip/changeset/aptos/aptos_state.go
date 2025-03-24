@@ -6,12 +6,20 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/smartcontractkit/chainlink/deployment"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 )
+
+const AptosReceiver deployment.ContractType = "AptosReceiver"
 
 // TODO: use chainlink/deployment/ccip/changeset/aptos_state.go
 type AptosCCIPChainState struct {
-	AptosMCMSObjAddr aptos.AccountAddress
-	AptosCCIPObjAddr aptos.AccountAddress
+	MCMSAddress      aptos.AccountAddress
+	CCIPAddress      aptos.AccountAddress
+	LinkTokenAddress aptos.AccountAddress
+
+	// Test contracts
+	TestRouterAddress   aptos.AccountAddress
+	TestReceiverAddress aptos.AccountAddress
 }
 
 // LoadOnchainStateAptos loads chain state for Aptos chains from env
@@ -39,17 +47,21 @@ func loadAptosChainStateFromAddresses(addresses map[string]deployment.TypeAndVer
 	chainState := AptosCCIPChainState{}
 	for addrStr, typeAndVersion := range addresses {
 		// Parse address
-		objAddress := &aptos.AccountAddress{}
-		err := objAddress.ParseStringRelaxed(addrStr)
+		address := &aptos.AccountAddress{}
+		err := address.ParseStringRelaxed(addrStr)
 		if err != nil {
 			return chainState, fmt.Errorf("failed to parse address %s for %s: %w", addrStr, typeAndVersion.Type, err)
 		}
 		// Set address based on type
 		switch typeAndVersion.Type {
 		case AptosMCMSType:
-			chainState.AptosMCMSObjAddr = *objAddress
+			chainState.MCMSAddress = *address
 		case AptosCCIPType:
-			chainState.AptosCCIPObjAddr = *objAddress
+			chainState.CCIPAddress = *address
+		case commontypes.LinkToken:
+			chainState.LinkTokenAddress = *address
+		case AptosReceiver:
+			chainState.TestReceiverAddress = *address
 		}
 	}
 	return chainState, nil
