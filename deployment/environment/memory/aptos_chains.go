@@ -119,7 +119,6 @@ func aptosChain(t *testing.T, chainSelector uint64, adminAddress aptos.AccountAd
 		break
 	}
 
-	fmt.Printf("DEBUG: aptos chain url: %s\n", url)
 	client, err := aptos.NewNodeClient(url, 0)
 	require.NoError(t, err)
 

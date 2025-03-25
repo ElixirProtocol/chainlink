@@ -87,7 +87,6 @@ func NewMemoryChainsSol(t *testing.T, numChains int) map[uint64]deployment.SolCh
 }
 
 func NewMemoryChainsAptos(t *testing.T, numChains int) map[uint64]deployment.AptosChain {
-	fmt.Printf("DEBUG: NewMemoryChainsAptos %d\n", numChains)
 	mchains := GenerateChainsAptos(t, numChains)
 	return generateMemoryChainAptos(mchains)
 }
