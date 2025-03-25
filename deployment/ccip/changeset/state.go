@@ -39,7 +39,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/view"
 	viewv1_0 "github.com/smartcontractkit/chainlink/deployment/ccip/view/v1_0"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/view/v1_2"
@@ -502,7 +501,7 @@ type CCIPOnChainState struct {
 	// When generating bindings, make sure the package name corresponds to the version.
 	Chains      map[uint64]CCIPChainState
 	SolChains   map[uint64]SolCCIPChainState
-	AptosChains map[uint64]aptos.AptosCCIPChainState
+	AptosChains map[uint64]AptosCCIPChainState
 }
 
 func (s CCIPOnChainState) OffRampPermissionLessExecutionThresholdSeconds(ctx context.Context, env deployment.Environment, selector uint64) (uint32, error) {
