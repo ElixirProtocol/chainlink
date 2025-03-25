@@ -1,12 +1,8 @@
 package memory
 
 import (
-	//"crypto/secp256k1"
-	//"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	//"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"crypto/ed25519"
 	"encoding/hex"
-	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -94,7 +90,7 @@ func aptosChain(t *testing.T, chainSelector uint64, adminAddress aptos.AccountAd
 	var containerName string
 	for i := 0; i < maxRetries; i++ {
 		// TODO(aptos): update CTF to be able to use the selected port
-		//port = freeport.GetOne(t)
+		// port = freeport.GetOne(t)
 		port = 8080
 
 		bcInput := &blockchain.Input{
@@ -103,7 +99,7 @@ func aptosChain(t *testing.T, chainSelector uint64, adminAddress aptos.AccountAd
 			// TODO(aptors): this should be chain id not chain selector?
 			ChainID:   strconv.FormatUint(chainSelector, 10),
 			PublicKey: adminAddress.String(),
-			Port:      fmt.Sprintf("%d", port),
+			Port:      strconv.FormatUint(uint64(port), 10),
 		}
 		output, err := blockchain.NewBlockchainNetwork(bcInput)
 		if err != nil {
