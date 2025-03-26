@@ -1,0 +1,1 @@
+The contracts files have been moved to https://github.com/smartcontractkit/chainlink-evm/tree/develop/contracts .
