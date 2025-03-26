@@ -519,7 +519,7 @@ func CreateKeys(t *testing.T,
 		keybundles[ctype] = keybundle
 
 		err = app.GetKeyStore().Aptos().EnsureKey(ctx)
-		require.NoError(t, err, "failed to create key for solana")
+		require.NoError(t, err, "failed to create key for Aptos")
 
 		aptoskeys, err := app.GetKeyStore().Aptos().GetAll()
 		require.NoError(t, err)

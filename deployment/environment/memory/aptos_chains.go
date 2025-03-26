@@ -86,20 +86,18 @@ func aptosChain(t *testing.T, chainSelector uint64, adminAddress aptos.AccountAd
 
 	maxRetries := 10
 	var url string
-	var port uint16
 	var containerName string
 	for i := 0; i < maxRetries; i++ {
 		// TODO(aptos): update CTF to be able to use the selected port
-		// port = freeport.GetOne(t)
-		port = 8080
+		// port := freeport.GetOne(t)
 
 		bcInput := &blockchain.Input{
 			Image: "", // filled out by defaultAptos function
 			Type:  "aptos",
-			// TODO(aptors): this should be chain id not chain selector?
+			// TODO(aptos): this should be chain id not chain selector?
 			ChainID:   strconv.FormatUint(chainSelector, 10),
 			PublicKey: adminAddress.String(),
-			Port:      strconv.FormatUint(uint64(port), 10),
+			// Port:      strconv.Itoa(port), // Defaults to 8080
 		}
 		output, err := blockchain.NewBlockchainNetwork(bcInput)
 		if err != nil {

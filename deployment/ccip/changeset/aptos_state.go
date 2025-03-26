@@ -16,7 +16,6 @@ const (
 	AptosReceiverType deployment.ContractType = "AptosReceiver"
 )
 
-// TODO: use chainlink/deployment/ccip/changeset/aptos_state.go
 type AptosCCIPChainState struct {
 	MCMSAddress      aptos.AccountAddress
 	CCIPAddress      aptos.AccountAddress
