@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 )
@@ -22,8 +23,8 @@ type AptosCCIPChainState struct {
 	LinkTokenAddress aptos.AccountAddress
 
 	// Test contracts
-	TestRouterAddress   aptos.AccountAddress
-	TestReceiverAddress aptos.AccountAddress
+	TestRouterAddress aptos.AccountAddress
+	ReceiverAddress   aptos.AccountAddress
 }
 
 // LoadOnchainStateAptos loads chain state for Aptos chains from env
@@ -65,7 +66,7 @@ func loadAptosChainStateFromAddresses(addresses map[string]deployment.TypeAndVer
 		case commontypes.LinkToken:
 			chainState.LinkTokenAddress = *address
 		case AptosReceiverType:
-			chainState.TestReceiverAddress = *address
+			chainState.ReceiverAddress = *address
 		}
 	}
 	return chainState, nil

@@ -222,6 +222,7 @@ func NewNode(
 	port int, // Port for the P2P V2 listener.
 	chains map[uint64]deployment.Chain,
 	solchains map[uint64]deployment.SolChain,
+	aptoschains map[uint64]deployment.AptosChain,
 	logLevel zapcore.Level,
 	bootstrap bool,
 	registryConfig deployment.CapabilityRegistryConfig,
@@ -291,6 +292,16 @@ func NewNode(
 		}
 		c.Solana = solConfigs
 
+		var aptosConfigs chainlink.RawConfigs
+		for chainID, chain := range aptoschains {
+			aptosChainID, err := chainsel.GetChainIDFromSelector(chainID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			aptosConfigs = append(aptosConfigs, createAptosChainConfig(aptosChainID, chain))
+		}
+		c.Aptos = aptosConfigs
+
 		for _, opt := range configOpts {
 			opt(c)
 		}
@@ -340,7 +351,7 @@ func NewNode(
 		AuditLogger:              audit.NoopLogger,
 	})
 	require.NoError(t, err)
-	keys := CreateKeys(t, app, chains, solchains)
+	keys := CreateKeys(t, app, chains, solchains, aptoschains)
 
 	// JD
 
@@ -350,6 +361,7 @@ func NewNode(
 		Chains: slices.Concat(
 			maps.Keys(chains),
 			maps.Keys(solchains),
+			maps.Keys(aptoschains),
 		),
 		Keys:       keys,
 		Addr:       net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
@@ -369,6 +381,7 @@ func CreateKeys(t *testing.T,
 	app chainlink.Application,
 	chains map[uint64]deployment.Chain,
 	solchains map[uint64]deployment.SolChain,
+	aptoschains map[uint64]deployment.AptosChain,
 ) Keys {
 	ctx := tests.Context(t)
 	_, err := app.GetKeyStore().P2P().Create(ctx)
@@ -493,6 +506,28 @@ func CreateKeys(t *testing.T,
 		transmitters[chain] = transmitter.ID()
 
 		// TODO: funding
+	}
+
+	if len(aptoschains) > 0 {
+		ctype := chaintype.Aptos
+		err = app.GetKeyStore().OCR2().EnsureKeys(ctx, ctype)
+		require.NoError(t, err)
+		keys, err := app.GetKeyStore().OCR2().GetAllOfType(ctype)
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		keybundle := keys[0]
+		keybundles[ctype] = keybundle
+
+		err = app.GetKeyStore().Aptos().EnsureKey(ctx)
+		require.NoError(t, err, "failed to create key for Aptos")
+
+		aptoskeys, err := app.GetKeyStore().Aptos().GetAll()
+		require.NoError(t, err)
+		require.Len(t, aptoskeys, 1)
+		transmitter := aptoskeys[0]
+		for chainSelector := range aptoschains {
+			transmitters[chainSelector] = transmitter.ID()
+		}
 	}
 
 	return Keys{
