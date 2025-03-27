@@ -23,11 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
-type AptosChain struct {
-	Client      *aptos.NodeClient
-	DeployerKey *aptos.Account
-}
-
 func getTestAptosChainSelectors() []uint64 {
 	// TODO: CTF to support different chain ids, need to investigate if it's possible (thru node config.yaml?)
 	return []uint64{chainsel.APTOS_LOCALNET.Selector}
@@ -57,20 +52,21 @@ func createAptosAccount(t *testing.T, useDefault bool) *aptos.Account {
 	}
 }
 
-func GenerateChainsAptos(t *testing.T, numChains int) map[uint64]AptosChain {
+func GenerateChainsAptos(t *testing.T, numChains int) map[uint64]deployment.AptosChain {
 	testAptosChainSelectors := getTestAptosChainSelectors()
 	if len(testAptosChainSelectors) < numChains {
 		t.Fatalf("not enough test aptos chain selectors available")
 	}
-	chains := make(map[uint64]AptosChain)
+	chains := make(map[uint64]deployment.AptosChain)
 	for i := 0; i < numChains; i++ {
-		chainID := testAptosChainSelectors[i]
+		selector := testAptosChainSelectors[i]
 		account := createAptosAccount(t, true)
 
-		nodeClient := aptosChain(t, chainID, account.Address)
-		chains[chainID] = AptosChain{
-			Client:      nodeClient,
-			DeployerKey: account,
+		nodeClient := aptosChain(t, selector, account.Address)
+		chains[selector] = deployment.AptosChain{
+			Selector:       selector,
+			Client:         nodeClient,
+			DeployerSigner: account,
 		}
 	}
 	t.Logf("Created %d Aptos chains: %+v", len(chains), chains)
