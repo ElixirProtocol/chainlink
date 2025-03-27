@@ -87,8 +87,7 @@ func NewMemoryChainsSol(t *testing.T, numChains int) map[uint64]deployment.SolCh
 }
 
 func NewMemoryChainsAptos(t *testing.T, numChains int) map[uint64]deployment.AptosChain {
-	mchains := GenerateChainsAptos(t, numChains)
-	return generateMemoryChainAptos(mchains)
+	return GenerateChainsAptos(t, numChains)
 }
 
 func NewMemoryChainsWithChainIDs(t *testing.T, chainIDs []uint64, numUsers int) (map[uint64]deployment.Chain, map[uint64][]*bind.TransactOpts) {
@@ -161,18 +160,6 @@ func generateMemoryChainSol(inputs map[uint64]SolanaChain) map[uint64]deployment
 				)
 				return err
 			},
-		}
-	}
-	return chains
-}
-
-func generateMemoryChainAptos(inputs map[uint64]AptosChain) map[uint64]deployment.AptosChain {
-	chains := make(map[uint64]deployment.AptosChain)
-	for cid, chain := range inputs {
-		chain := chain
-		chains[cid] = deployment.AptosChain{
-			Client:         chain.Client,
-			DeployerSigner: chain.DeployerKey,
 		}
 	}
 	return chains
