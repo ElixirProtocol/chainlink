@@ -102,7 +102,7 @@ func deployMCMSContractsForAptosChain(p *deployAptosMCMSParams) error {
 	// TODO: This returns nextOpCount, we should keep track of it when merging migrations
 	proposal, _, err := ops.GenerateAcceptOwnershipProposal(addressMCMS, contractMCMS)
 	if err != nil {
-		return fmt.Errorf("failed to build proposal: %w", err)
+		return fmt.Errorf("failed to build AcceptOwnership proposal: %w", err)
 	}
 	*p.proposals = append(*p.proposals, *proposal)
 

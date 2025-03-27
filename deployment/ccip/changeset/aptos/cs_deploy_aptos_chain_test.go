@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,10 +29,10 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 				ExistingAddresses: getTestAddressBook(
 					map[uint64]map[string]deployment.TypeAndVersion{
 						4457093679053095497: {
-							mockMCMSAddress: {Type: AptosMCMSType},
+							mockMCMSAddress: {Type: changeset.AptosMCMSType},
 						},
 						743186221051783445: {
-							mockMCMSAddress: {Type: AptosMCMSType},
+							mockMCMSAddress: {Type: changeset.AptosMCMSType},
 						},
 					},
 				),
@@ -55,10 +56,10 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 				ExistingAddresses: getTestAddressBook(
 					map[uint64]map[string]deployment.TypeAndVersion{
 						4457093679053095497: {
-							mockMCMSAddress: {Type: AptosMCMSType},
+							mockMCMSAddress: {Type: changeset.AptosMCMSType},
 						},
 						743186221051783445: {
-							mockMCMSAddress: {Type: AptosMCMSType},
+							mockMCMSAddress: {Type: changeset.AptosMCMSType},
 						},
 					},
 				),
