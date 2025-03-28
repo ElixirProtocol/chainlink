@@ -28,17 +28,23 @@ func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.Commi
 	encoder := agbinary.NewBorshEncoder(&buf)
 	combinedRoots := report.BlessedMerkleRoots
 	combinedRoots = append(combinedRoots, report.UnblessedMerkleRoots...)
-	if len(combinedRoots) != 1 {
-		return nil, fmt.Errorf("unexpected merkle root length in report: %d", len(combinedRoots))
-	}
+	var mr *ccip_offramp.MerkleRoot
+	switch len(combinedRoots) {
+	case 0:
+		// price updates only, zero the root
+	case 1:
+		// valid
+		merkleRoot := combinedRoots[0]
+		mr = &ccip_offramp.MerkleRoot{
+			SourceChainSelector: uint64(merkleRoot.ChainSel),
+			OnRampAddress:       merkleRoot.OnRampAddress,
+			MinSeqNr:            uint64(merkleRoot.SeqNumsRange.Start()),
+			MaxSeqNr:            uint64(merkleRoot.SeqNumsRange.End()),
+			MerkleRoot:          merkleRoot.MerkleRoot,
+		}
 
-	merkleRoot := combinedRoots[0]
-	mr := &ccip_offramp.MerkleRoot{
-		SourceChainSelector: uint64(merkleRoot.ChainSel),
-		OnRampAddress:       merkleRoot.OnRampAddress,
-		MinSeqNr:            uint64(merkleRoot.SeqNumsRange.Start()),
-		MaxSeqNr:            uint64(merkleRoot.SeqNumsRange.End()),
-		MerkleRoot:          merkleRoot.MerkleRoot,
+	default:
+		return nil, fmt.Errorf("unexpected merkle root length in report: %d", len(combinedRoots))
 	}
 
 	tpu := make([]ccip_offramp.TokenPriceUpdate, 0, len(report.PriceUpdates.TokenPriceUpdates))
@@ -186,13 +192,17 @@ func encodeBigIntToFixedLengthLE(bi *big.Int, length int) []byte {
 }
 
 func decodeLEToBigInt(data []byte) cciptypes.BigInt {
+	// Avoid modifying original data
+	buf := make([]byte, len(data))
+	copy(buf, data)
+
 	// Reverse the byte array to convert it from little-endian to big-endian
-	for i, j := 0, len(data)-1; i < j; i, j = i+1, j-1 {
-		data[i], data[j] = data[j], data[i]
+	for i, j := 0, len(buf)-1; i < j; i, j = i+1, j-1 {
+		buf[i], buf[j] = buf[j], buf[i]
 	}
 
 	// Use big.Int.SetBytes to construct the big.Int
-	bi := new(big.Int).SetBytes(data)
+	bi := new(big.Int).SetBytes(buf)
 	if bi.Cmp(big.NewInt(0)) == 0 {
 		return cciptypes.NewBigInt(big.NewInt(0))
 	}

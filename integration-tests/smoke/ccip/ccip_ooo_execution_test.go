@@ -126,8 +126,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		sourceChain,
 		destChain,
 		tokenTransfer,
-		firstReceiver,
-		false,
+		firstReceiver.Bytes(),
 		nil,
 		testhelpers.MakeEVMExtraArgsV2(0, true),
 	)
@@ -146,8 +145,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		sourceChain,
 		destChain,
 		usdcTransfer,
-		secondReceiver,
-		false,
+		secondReceiver.Bytes(),
 		nil,
 		nil,
 	)
@@ -165,8 +163,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		sourceChain,
 		destChain,
 		tokenTransfer,
-		thirdReceiver,
-		false,
+		thirdReceiver.Bytes(),
 		nil,
 		testhelpers.MakeEVMExtraArgsV2(0, false),
 	)
@@ -184,8 +181,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 		sourceChain,
 		destChain,
 		tokenTransfer,
-		fourthReceiver,
-		false,
+		fourthReceiver.Bytes(),
 		[]byte("this message has enough gas to execute"),
 		testhelpers.MakeEVMExtraArgsV2(300_000, true),
 	)
@@ -196,7 +192,7 @@ func Test_OutOfOrderExecution(t *testing.T) {
 
 	// Ordered token transfer, but using different sender, should be executed
 	fifthReceiver := utils.RandomAddress()
-	fifthMessage, err := testhelpers.DoSendRequest(t, e, state,
+	fifthMessage, err := testhelpers.SendRequest(t, e, state,
 		testhelpers.WithSender(anotherSender),
 		testhelpers.WithSourceChain(sourceChain),
 		testhelpers.WithDestChain(destChain),

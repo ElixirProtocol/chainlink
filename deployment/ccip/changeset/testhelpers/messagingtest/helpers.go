@@ -1,13 +1,19 @@
 package messagingtest
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
+
+	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -82,7 +88,7 @@ type TestCase struct {
 	TestSetup
 	Replayed               bool
 	Nonce                  uint64
-	Receiver               common.Address
+	Receiver               []byte
 	MsgData                []byte
 	ExtraArgs              []byte
 	ExpectedExecutionState int
@@ -95,12 +101,17 @@ type TestCaseOutput struct {
 	MsgSentEvent *onramp.OnRampCCIPMessageSent
 }
 
-func sleepAndReplay(t *testing.T, e testhelpers.DeployedEnv, sourceChain, destChain uint64) {
+func sleepAndReplay(t *testing.T, e testhelpers.DeployedEnv, chainSelectors ...uint64) {
 	time.Sleep(30 * time.Second)
 	replayBlocks := make(map[uint64]uint64)
-	replayBlocks[sourceChain] = 1
-	replayBlocks[destChain] = 1
-
+	for _, selector := range chainSelectors {
+		family, err := chain_selectors.GetSelectorFamily(selector)
+		require.NoError(t, err)
+		// log replay is only available on EVM
+		if family == chain_selectors.FamilyEVM {
+			replayBlocks[selector] = 1
+		}
+	}
 	testhelpers.ReplayLogs(t, e.Env.Offchain, replayBlocks)
 }
 
@@ -116,10 +127,16 @@ func getLatestNonce(tc TestCase) uint64 {
 		}, tc.SourceChain, tc.Sender)
 		require.NoError(tc.T, err)
 	case chain_selectors.FamilySolana:
-		// var nonceCounterAccount ccip_router.Nonce
-		// err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonceEvmPDA, config.DefaultCommitment, &nonceCounterAccount)
-		// require.NoError(t, err, "failed to get account info")
-		// require.Equal(t, uint64(1), nonceCounterAccount.Counter)
+		ctx := context.Background()
+		client := tc.Env.SolChains[tc.DestChain].Client
+		// TODO: solcommon.FindNoncePDA expected the sender to be a solana pubkey
+		chainSelectorLE := solcommon.Uint64ToLE(tc.DestChain)
+		noncePDA, _, err := solana.FindProgramAddress([][]byte{[]byte("nonce"), chainSelectorLE, tc.Sender}, tc.OnchainState.SolChains[tc.DestChain].Router)
+		require.NoError(tc.T, err)
+		var nonceCounterAccount ccip_router.Nonce
+		// we ignore the error because the account might not exist yet
+		_ = solcommon.GetAccountDataBorshInto(ctx, client, noncePDA, solconfig.DefaultCommitment, &nonceCounterAccount)
+		latestNonce = nonceCounterAccount.Counter
 	}
 	return latestNonce
 }
@@ -133,6 +150,31 @@ func Run(tc TestCase) (out TestCaseOutput) {
 	}
 
 	startBlocks := make(map[uint64]*uint64)
+
+	family, err := chain_selectors.GetSelectorFamily(tc.SourceChain)
+	require.NoError(tc.T, err)
+
+	var msg any
+	switch family {
+	case chain_selectors.FamilyEVM:
+		msg = router.ClientEVM2AnyMessage{
+			Receiver:     common.LeftPadBytes(tc.Receiver, 32),
+			Data:         tc.MsgData,
+			TokenAmounts: nil,
+			FeeToken:     common.HexToAddress("0x0"),
+			ExtraArgs:    tc.ExtraArgs,
+		}
+	case chain_selectors.FamilySolana:
+		msg = ccip_router.SVM2AnyMessage{
+			Receiver:     common.LeftPadBytes(tc.Receiver, 32),
+			TokenAmounts: nil,
+			Data:         tc.MsgData,
+			ExtraArgs:    tc.ExtraArgs,
+		}
+
+	default:
+		tc.T.Errorf("unsupported source chain: %v", family)
+	}
 	msgSentEvent := testhelpers.TestSendRequest(
 		tc.T,
 		tc.Env,
@@ -140,24 +182,16 @@ func Run(tc TestCase) (out TestCaseOutput) {
 		tc.SourceChain,
 		tc.DestChain,
 		tc.TestRouter,
-		router.ClientEVM2AnyMessage{
-			Receiver:     common.LeftPadBytes(tc.Receiver.Bytes(), 32),
-			Data:         tc.MsgData,
-			TokenAmounts: nil,
-			FeeToken:     common.HexToAddress("0x0"),
-			ExtraArgs:    tc.ExtraArgs,
-		})
+		msg)
+	sourceDest := testhelpers.SourceDestPair{
+		SourceChainSelector: tc.SourceChain,
+		DestChainSelector:   tc.DestChain,
+	}
 	expectedSeqNum := map[testhelpers.SourceDestPair]uint64{
-		{
-			SourceChainSelector: tc.SourceChain,
-			DestChainSelector:   tc.DestChain,
-		}: msgSentEvent.SequenceNumber,
+		sourceDest: msgSentEvent.SequenceNumber,
 	}
 	expectedSeqNumExec := map[testhelpers.SourceDestPair][]uint64{
-		{
-			SourceChainSelector: tc.SourceChain,
-			DestChainSelector:   tc.DestChain,
-		}: {msgSentEvent.SequenceNumber},
+		sourceDest: {msgSentEvent.SequenceNumber},
 	}
 	out.MsgSentEvent = msgSentEvent
 
@@ -179,24 +213,25 @@ func Run(tc TestCase) (out TestCaseOutput) {
 		require.Equalf(
 			tc.T,
 			tc.ExpectedExecutionState,
-			execStates[testhelpers.SourceDestPair{
-				SourceChainSelector: tc.SourceChain,
-				DestChainSelector:   tc.DestChain,
-			}][msgSentEvent.SequenceNumber],
+			execStates[sourceDest][msgSentEvent.SequenceNumber],
 			"wrong execution state for seq nr %d, expected %d, got %d",
 			msgSentEvent.SequenceNumber,
 			tc.ExpectedExecutionState,
-			execStates[testhelpers.SourceDestPair{
-				SourceChainSelector: tc.SourceChain,
-				DestChainSelector:   tc.DestChain,
-			}][msgSentEvent.SequenceNumber],
+			execStates[sourceDest][msgSentEvent.SequenceNumber],
 		)
 
-		// check the sender latestNonce on the dest, should be incremented
-		latestNonce := getLatestNonce(tc)
-		require.Equal(tc.T, tc.Nonce+1, latestNonce)
-		out.Nonce = latestNonce
-		tc.T.Logf("confirmed nonce bump for sender %x, latestNonce %d", tc.Sender, latestNonce)
+		family, err := chain_selectors.GetSelectorFamily(tc.DestChain)
+		require.NoError(tc.T, err)
+
+		// Solana doesn't support catching CPI errors, so nonces can't be ordered
+		unorderedExec := family == chain_selectors.FamilySolana
+
+		if !unorderedExec {
+			latestNonce := getLatestNonce(tc)
+			require.Equal(tc.T, tc.Nonce+1, latestNonce)
+			out.Nonce = latestNonce
+			tc.T.Logf("confirmed nonce bump for sender %x, latestNonce %d", tc.Sender, latestNonce)
+		}
 
 		for _, assertion := range tc.ExtraAssertions {
 			assertion(tc.T)
