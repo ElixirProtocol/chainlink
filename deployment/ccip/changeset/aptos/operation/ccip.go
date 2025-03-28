@@ -39,17 +39,18 @@ func (op *CCIPDeploymentOperations) GenerateCleanupStagingProposal() error {
 
 	// Bind MCMS contract
 	mcmsContract := mcmsbind.Bind(op.OnChainState.MCMSAddress, op.AptosChain.Client)
+	mcmsAddress := mcmsContract.Address()
 
 	// Get cleanup staging operations
 	var operations []types.Operation
-	module, function, _, args, err := mcmsContract.MCMSDeployer.EncodeCleanupStagingArea()
+	moduleInfo, function, _, args, err := mcmsContract.MCMSDeployer().Encoder().CleanupStagingArea()
 	if err != nil {
 		return fmt.Errorf("failed to EncodeCleanupStagingArea: %w", err)
 	}
 	additionalFields := aptosmcms.AdditionalFields{
-		ModuleName:  module.Name,
+		PackageName: moduleInfo.PackageName,
+		ModuleName:  moduleInfo.ModuleName,
 		Function:    function,
-		PackageName: "mcms",
 	}
 	afBytes, err := json.Marshal(additionalFields)
 	if err != nil {
@@ -58,7 +59,7 @@ func (op *CCIPDeploymentOperations) GenerateCleanupStagingProposal() error {
 	operations = append(operations, types.Operation{
 		ChainSelector: types.ChainSelector(op.AptosChain.Selector),
 		Transaction: types.Transaction{
-			To:               mcmsContract.Address.StringLong(),
+			To:               mcmsAddress.StringLong(),
 			Data:             aptosmcms.ArgsToData(args),
 			AdditionalFields: afBytes,
 		},
@@ -67,7 +68,7 @@ func (op *CCIPDeploymentOperations) GenerateCleanupStagingProposal() error {
 	// Generate cleanup proposal
 	proposal, nextOpCount, err := utils.GenerateProposal(
 		op.AptosChain.Client,
-		mcmsContract,
+		mcmsContract.Address(),
 		op.AptosChain.Selector,
 		operations,
 		"Cleanup Staging Area",
@@ -102,7 +103,7 @@ func (op *CCIPDeploymentOperations) GenerateDeployCCIPProposal() (*aptos.Account
 	op.Ab.Save(op.AptosChain.Selector, ccipObjectAddress.String(), typeAndVersion)
 
 	// Generate deploy proposal
-	proposal, nextOpCount, err := utils.GenerateProposal(op.AptosChain.Client, mcmsContract, op.AptosChain.Selector, operations, "Deploy CCIP Package", op.MCMSOpCount)
+	proposal, nextOpCount, err := utils.GenerateProposal(op.AptosChain.Client, mcmsContract.Address(), op.AptosChain.Selector, operations, "Deploy CCIP Package", op.MCMSOpCount)
 	op.MCMSOpCount = nextOpCount
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deploy proposal: %w", err)
@@ -123,7 +124,7 @@ func (op *CCIPDeploymentOperations) GenerateDeployRouterProposal(ccipObjectAddre
 	}
 
 	// Generate deploy proposal
-	proposal, nextOpCount, err := utils.GenerateProposal(op.AptosChain.Client, mcmsContract, op.AptosChain.Selector, operations, "Deploy Router Package", op.MCMSOpCount)
+	proposal, nextOpCount, err := utils.GenerateProposal(op.AptosChain.Client, mcmsContract.Address(), op.AptosChain.Selector, operations, "Deploy Router Package", op.MCMSOpCount)
 	op.MCMSOpCount = nextOpCount
 	if err != nil {
 		return fmt.Errorf("failed to create deploy proposal: %w", err)
@@ -135,19 +136,19 @@ func (op *CCIPDeploymentOperations) GenerateDeployRouterProposal(ccipObjectAddre
 
 func (op *CCIPDeploymentOperations) getCCIPDeployOperations(mcmsContract mcmsbind.MCMS, chainSel uint64) (aptos.AccountAddress, []types.Operation, error) {
 	// Calculate addresses of the owner and the object
-	ccipObjectAddress, err := mcmsContract.MCMSRegistry.GetNewCodeObjectAddress(nil, []byte(ccip.DefaultSeed))
+	ccipObjectAddress, err := mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(ccip.DefaultSeed))
 	if err != nil {
 		return ccipObjectAddress, []types.Operation{}, fmt.Errorf("failed to calculate object address: %w", err)
 	}
 
 	// Compile Package
-	payload, err := ccip.Compile(ccipObjectAddress, mcmsContract.Address, true)
+	payload, err := ccip.Compile(ccipObjectAddress, mcmsContract.Address(), true)
 	if err != nil {
 		return ccipObjectAddress, []types.Operation{}, fmt.Errorf("failed to compile: %w", err)
 	}
 
 	// Create chunks and stage operations
-	operations, err := utils.CreateChunksAndStage(payload, mcmsContract, chainSel, ccip.DefaultSeed, nil, "ccip")
+	operations, err := utils.CreateChunksAndStage(payload, mcmsContract, chainSel, ccip.DefaultSeed, nil)
 	if err != nil {
 		return ccipObjectAddress, operations, fmt.Errorf("failed to create chunks and stage for %d: %w", chainSel, err)
 	}
@@ -160,13 +161,13 @@ func (op *CCIPDeploymentOperations) getRouterDeployOperations(
 	ccipObjectAddress *aptos.AccountAddress,
 ) ([]types.Operation, error) {
 	// Compile Package
-	payload, err := router.Compile(*ccipObjectAddress)
+	payload, err := router.Compile(*ccipObjectAddress, mcmsContract.Address())
 	if err != nil {
 		return []types.Operation{}, fmt.Errorf("failed to compile: %w", err)
 	}
 
 	// Create chunks and stage operations
-	operations, err := utils.CreateChunksAndStage(payload, mcmsContract, op.AptosChain.Selector, "", ccipObjectAddress, "ccip")
+	operations, err := utils.CreateChunksAndStage(payload, mcmsContract, op.AptosChain.Selector, "", ccipObjectAddress)
 	if err != nil {
 		return operations, fmt.Errorf("failed to create chunks and stage for %d: %w", op.AptosChain.Selector, err)
 	}

@@ -201,7 +201,7 @@ func TestCsDeployAptosChain_Apply(t *testing.T) {
 
 	// Bind CCIP contract
 	ccipContract := ccipbind.Bind(ccipAddr, e.AptosChains[chainSelector].Client)
-	ownerAddr, err := ccipContract.Auth.Owner(nil)
+	ownerAddr, err := ccipContract.Auth().Owner(nil)
 	require.NoError(t, err)
 	require.NotEqual(t, aptos.AccountAddress{}, ownerAddr)
 }

@@ -67,7 +67,7 @@ func verifyMCMSDeployment(t *testing.T, e deployment.Environment, chainSelector 
 
 	// Bind MCMS contract
 	mcmsContract := mcmsbind.Bind(mcmsAddr, client)
-	ownerAddr, err := mcmsContract.MCMSAccount.Owner(nil)
+	ownerAddr, err := mcmsContract.MCMSAccount().Owner(nil)
 	require.NoError(t, err)
 	require.NotEqual(t, aptos.AccountAddress{}, ownerAddr)
 }

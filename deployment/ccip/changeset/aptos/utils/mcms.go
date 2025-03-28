@@ -22,7 +22,7 @@ const (
 
 func GenerateProposal(
 	client aptos.AptosRpcClient,
-	mcmsContract mcmsbind.MCMS,
+	mcmsAddress aptos.AccountAddress,
 	chainSel uint64,
 	operations []types.Operation,
 	description string,
@@ -31,7 +31,7 @@ func GenerateProposal(
 	if opCount == 0 {
 		// Create MCMS inspector
 		inspector := aptosmcms.NewInspector(client)
-		startingOpCount, err := inspector.GetOpCount(context.Background(), mcmsContract.Address.StringLong())
+		startingOpCount, err := inspector.GetOpCount(context.Background(), mcmsAddress.StringLong())
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get starting op count: %w", err)
 		}
@@ -49,7 +49,7 @@ func GenerateProposal(
 			types.ChainSelector(chainSel),
 			types.ChainMetadata{
 				StartingOpCount: opCount,
-				MCMAddress:      mcmsContract.Address.StringLong(),
+				MCMAddress:      mcmsAddress.StringLong(),
 			},
 		)
 
@@ -72,8 +72,8 @@ func CreateChunksAndStage(
 	chainSel uint64,
 	seed string,
 	codeObjectAddress *aptos.AccountAddress,
-	packageName string, // TODO: this will be returned from Encode method
 ) ([]types.Operation, error) {
+	mcmsAddress := mcmsContract.Address()
 	// Validate seed XOR codeObjectAddress, one and only one must be provided
 	if (seed != "") == (codeObjectAddress != nil) {
 		return nil, fmt.Errorf("either provide seed to publishToObject or objectAddress to upgradeObjectCode")
@@ -90,28 +90,28 @@ func CreateChunksAndStage(
 	// Stage chunks with mcms_deployer module and execute with the last one
 	for i, chunk := range chunks {
 		var (
-			module   aptos.ModuleId
-			function string
-			args     [][]byte
-			err      error
+			moduleInfo bind.ModuleInformation
+			function   string
+			args       [][]byte
+			err        error
 		)
 
 		// First chunks get staged, the last one gets published or upgraded
 		if i != len(chunks)-1 {
-			module, function, _, args, err = mcmsContract.MCMSDeployer.EncodeStageCodeChunk(
+			moduleInfo, function, _, args, err = mcmsContract.MCMSDeployer().Encoder().StageCodeChunk(
 				chunk.Metadata,
 				chunk.CodeIndices,
 				chunk.Chunks,
 			)
 		} else if seed != "" {
-			module, function, _, args, err = mcmsContract.MCMSDeployer.EncodeStageCodeChunkAndPublishToObject(
+			moduleInfo, function, _, args, err = mcmsContract.MCMSDeployer().Encoder().StageCodeChunkAndPublishToObject(
 				chunk.Metadata,
 				chunk.CodeIndices,
 				chunk.Chunks,
 				[]byte(seed),
 			)
 		} else {
-			module, function, _, args, err = mcmsContract.MCMSDeployer.EncodeStageCodeChunkAndUpgradeObjectCode(
+			moduleInfo, function, _, args, err = mcmsContract.MCMSDeployer().Encoder().StageCodeChunkAndUpgradeObjectCode(
 				chunk.Metadata,
 				chunk.CodeIndices,
 				chunk.Chunks,
@@ -122,9 +122,9 @@ func CreateChunksAndStage(
 			return operations, fmt.Errorf("failed to encode chunk %d: %w", i, err)
 		}
 		additionalFields := aptosmcms.AdditionalFields{
-			ModuleName:  module.Name,
+			PackageName: moduleInfo.PackageName,
+			ModuleName:  moduleInfo.ModuleName,
 			Function:    function,
-			PackageName: packageName,
 		}
 		afBytes, err := json.Marshal(additionalFields)
 		if err != nil {
@@ -133,7 +133,7 @@ func CreateChunksAndStage(
 		operations = append(operations, types.Operation{
 			ChainSelector: types.ChainSelector(chainSel),
 			Transaction: types.Transaction{
-				To:               mcmsContract.Address.StringLong(),
+				To:               mcmsAddress.StringLong(),
 				Data:             aptosmcms.ArgsToData(args),
 				AdditionalFields: afBytes,
 			},

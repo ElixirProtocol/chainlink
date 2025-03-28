@@ -42,7 +42,7 @@ func createAptosAccount(t *testing.T, useDefault bool) *aptos.Account {
 
 		t.Logf("Using default Aptos account: %s %+v", addressStr, privateKeyBytes)
 
-		account, err := aptos.NewAccountFromSigner(&crypto.Ed25519PrivateKey{Inner: privateKey}, *defaultAddress.AuthKey())
+		account, err := aptos.NewAccountFromSigner(&crypto.Ed25519PrivateKey{Inner: privateKey}, defaultAddress)
 		require.NoError(t, err)
 		return account
 	} else {
