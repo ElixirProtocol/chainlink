@@ -17,6 +17,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
+	mcmsaptossdk "github.com/smartcontractkit/mcms/sdk/aptos"
 	mcmsevmsdk "github.com/smartcontractkit/mcms/sdk/evm"
 	mcmssolanasdk "github.com/smartcontractkit/mcms/sdk/solana"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
@@ -164,6 +165,13 @@ func SignMCMSProposal(t *testing.T, env deployment.Environment, proposal *mcmsli
 		inspectorsMap[chainSel] = mcmssolanasdk.NewInspector(chain.Client)
 	}
 
+	for _, chain := range env.AptosChains {
+		_, exists := chainsel.AptosChainBySelector(chain.Selector)
+		require.True(t, exists)
+		chainSel := mcmstypes.ChainSelector(chain.Selector)
+		inspectorsMap[chainSel] = mcmsaptossdk.NewInspector(chain.Client)
+	}
+
 	proposal.UseSimulatedBackend(true)
 
 	signable, err := mcmslib.NewSignable(proposal, inspectorsMap)
@@ -215,6 +223,14 @@ func ExecuteMCMSProposalV2(t *testing.T, env deployment.Environment, proposal *m
 				env.SolChains[uint64(op.ChainSelector)].URL,
 				env.SolChains[uint64(op.ChainSelector)].DeployerKey.PublicKey().String(),
 			)
+		case chainsel.FamilyAptos:
+			encoder := encoders[op.ChainSelector].(*mcmsaptossdk.Encoder)
+			executorsMap[op.ChainSelector] = mcmsaptossdk.NewExecutor(
+				env.AptosChains[uint64(op.ChainSelector)].Client,
+				env.AptosChains[uint64(op.ChainSelector)].DeployerSigner,
+				encoder,
+			)
+			t.Logf("[ExecuteMCMSProposalV2] Using Aptos chain with chainSelector=%d", uint64(op.ChainSelector))
 
 		default:
 			require.FailNow(t, "unsupported chain family")

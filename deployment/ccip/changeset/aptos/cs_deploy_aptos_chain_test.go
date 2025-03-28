@@ -3,10 +3,19 @@ package aptos
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+
+	ccipbind "github.com/smartcontractkit/chainlink-aptos/bindings/ccip"
 )
 
 func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
@@ -21,7 +30,7 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 			name: "success - valid config and state",
 			env: deployment.Environment{
 				Name:   "test",
-				Logger: logger.Test(t),
+				Logger: logger.TestLogger(t),
 				AptosChains: map[uint64]deployment.AptosChain{
 					743186221051783445:  {},
 					4457093679053095497: {},
@@ -49,7 +58,7 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 			name: "error - chain has no env",
 			env: deployment.Environment{
 				Name:   "test",
-				Logger: logger.Test(t),
+				Logger: logger.TestLogger(t),
 				AptosChains: map[uint64]deployment.AptosChain{
 					4457093679053095497: {},
 				},
@@ -77,7 +86,7 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 			name: "error - invalid config - chainSelector",
 			env: deployment.Environment{
 				Name:              "test",
-				Logger:            logger.Test(t),
+				Logger:            logger.TestLogger(t),
 				ExistingAddresses: deployment.NewMemoryAddressBook(),
 				AptosChains:       map[uint64]deployment.AptosChain{},
 			},
@@ -93,7 +102,7 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 			name: "error - missing MCMS contract for 2 chains",
 			env: deployment.Environment{
 				Name:   "test",
-				Logger: logger.Test(t),
+				Logger: logger.TestLogger(t),
 				AptosChains: map[uint64]deployment.AptosChain{
 					743186221051783445:  {},
 					4457093679053095497: {},
@@ -132,4 +141,67 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCsDeployAptosChain_Apply(t *testing.T) {
+	t.Parallel()
+	lggr := logger.TestLogger(t)
+
+	// Setup memory environment with 1 Aptos chain
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
+		AptosChains: 1,
+	})
+
+	// Get chain selectors
+	aptosChainSelectors := e.AllChainSelectorsAptos()
+	require.Equal(t, 1, len(aptosChainSelectors), "Expected exactly 1 Aptos chain")
+	chainSelector := aptosChainSelectors[0]
+	t.Log("Deployer: ", e.AptosChains[chainSelector].DeployerSigner)
+
+	// First deploy MCMS since it's a precondition for deploying CCIP
+	mcmsConfig := proposalutils.SingleGroupMCMSV2(t)
+	e, err := commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
+		commonchangeset.Configure(
+			CsDeployAptosMCMS,
+			DeployAptosMCMSConfig{
+				MCMSConfigPerChain: map[uint64]mcmstypes.Config{
+					chainSelector: mcmsConfig,
+				},
+			},
+		),
+	})
+	require.NoError(t, err)
+
+	// Create CCIP chain configuration
+	ccipConfig := DeployAptosChainConfig{
+		ContractParamsPerChain: map[uint64]ChainContractParams{
+			chainSelector: getMockChainContractParams(t, chainSelector),
+		},
+	}
+
+	// Deploy CCIP to Aptos chain
+	ccipOutput, err := CsDeployAptosChain.Apply(e, ccipConfig)
+	require.NoError(t, err)
+
+	// Merge CCIP output addresses into existing AB
+	err = e.ExistingAddresses.Merge(ccipOutput.AddressBook)
+	require.NoError(t, err)
+
+	// Verify generated proposals
+	require.Equal(t, len(ccipOutput.MCMSProposals), 2, "Should have at least 3 proposals (cleanup, CCIP deployment, Router deployment)")
+
+	// Verify CCIP deployment state by binding ccip contract and checking if it's deployed
+	// Verify CCIP was deployed
+	state, err := changeset.LoadOnchainStateAptos(e)
+	require.NoError(t, err)
+	require.NotNil(t, state[chainSelector], "No state found for chain")
+
+	ccipAddr := state[chainSelector].CCIPAddress
+	require.NotEmpty(t, ccipAddr, "CCIP address should not be empty")
+
+	// Bind CCIP contract
+	ccipContract := ccipbind.Bind(ccipAddr, e.AptosChains[chainSelector].Client)
+	ownerAddr, err := ccipContract.Auth.Owner(nil)
+	require.NoError(t, err)
+	require.NotEqual(t, aptos.AccountAddress{}, ownerAddr)
 }
