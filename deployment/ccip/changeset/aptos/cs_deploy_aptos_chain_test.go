@@ -3,7 +3,6 @@ package aptos
 import (
 	"testing"
 
-	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -158,40 +157,32 @@ func TestCsDeployAptosChain_Apply(t *testing.T) {
 	chainSelector := aptosChainSelectors[0]
 	t.Log("Deployer: ", e.AptosChains[chainSelector].DeployerSigner)
 
-	// First deploy MCMS since it's a precondition for deploying CCIP
+	// Deploy MCMS
 	mcmsConfig := proposalutils.SingleGroupMCMSV2(t)
+	mcmsDeployConfig := DeployAptosMCMSConfig{
+		MCMSConfigPerChain: map[uint64]mcmstypes.Config{
+			chainSelector: mcmsConfig,
+		},
+	}
+
 	e, err := commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
-		commonchangeset.Configure(
-			CsDeployAptosMCMS,
-			DeployAptosMCMSConfig{
-				MCMSConfigPerChain: map[uint64]mcmstypes.Config{
-					chainSelector: mcmsConfig,
-				},
-			},
-		),
+		commonchangeset.Configure(CsDeployAptosMCMS, mcmsDeployConfig),
 	})
 	require.NoError(t, err)
 
-	// Create CCIP chain configuration
+	// Deploy CCIP to Aptos chain
 	ccipConfig := DeployAptosChainConfig{
 		ContractParamsPerChain: map[uint64]ChainContractParams{
 			chainSelector: getMockChainContractParams(t, chainSelector),
 		},
 	}
 
-	// Deploy CCIP to Aptos chain
-	ccipOutput, err := CsDeployAptosChain.Apply(e, ccipConfig)
+	e, err = commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
+		commonchangeset.Configure(CsDeployAptosChain, ccipConfig),
+	})
 	require.NoError(t, err)
-
-	// Merge CCIP output addresses into existing AB
-	err = e.ExistingAddresses.Merge(ccipOutput.AddressBook)
-	require.NoError(t, err)
-
-	// Verify generated proposals
-	require.Equal(t, len(ccipOutput.MCMSProposals), 2, "Should have at least 3 proposals (cleanup, CCIP deployment, Router deployment)")
 
 	// Verify CCIP deployment state by binding ccip contract and checking if it's deployed
-	// Verify CCIP was deployed
 	state, err := changeset.LoadOnchainStateAptos(e)
 	require.NoError(t, err)
 	require.NotNil(t, state[chainSelector], "No state found for chain")
@@ -203,5 +194,5 @@ func TestCsDeployAptosChain_Apply(t *testing.T) {
 	ccipContract := ccipbind.Bind(ccipAddr, e.AptosChains[chainSelector].Client)
 	ownerAddr, err := ccipContract.Auth().Owner(nil)
 	require.NoError(t, err)
-	require.NotEqual(t, aptos.AccountAddress{}, ownerAddr)
+	require.Equal(t, state[chainSelector].MCMSAddress, ownerAddr, "MCMS must own CCIP contract")
 }
