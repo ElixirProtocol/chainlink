@@ -214,12 +214,18 @@ jobs:
     if: ${{ github.actor != 'dependabot[bot]' }}
     needs: [filter, run-frequency]
     # runs-on rollout - use self-hosted runners 10% of the time
-    runs-on: ${{needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.os-self-hosted || matrix.type.os }}
+    runs-on: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.os-self-hosted || matrix.type.os }}
     permissions:
       id-token: write
       contents: read
       actions: read
     steps:
+      - name: Debug
+        run: |
+          echo "Value: ${{ needs.run-frequency.outputs.should-use-self-hosted }}"
+          echo "Equality: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true'}}"
+          echo "Ternary: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' && matrix.type.os-self-hosted || matrix.type.os }}"
+
       - name: Enable S3 Cache for Self-Hosted Runners
         if: ${{ needs.run-frequency.outputs.should-use-self-hosted == 'true' }}
         uses: runs-on/action@66d4449b717b5462159659523d1241051ff470b9 # v1
@@ -636,10 +642,15 @@ jobs:
       - name: Self-hosted Runner Frequencies
         id: check-branch
         run: |
-          if ["$GITHUB_EVENT_NAME" == "workflow_dispatch" ]; then
+          echo "Event name: ${GITHUB_EVENT_NAME}"
+
+          if [ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]; then
+            echo "Using self-hosted runners for workflow dispatch events"
             echo "self-hosted-runners=true" | tee -a $GITHUB_OUTPUT
             exit 0
           fi
+
+          echo "Not using self-hosted runners for this event"
 
           exit 0
           # Only enable for workflow dispatch events for now
