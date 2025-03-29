@@ -181,10 +181,11 @@ func NewEventHandler(
 }
 
 func (h *eventHandler) Close() error {
-	return services.MultiCloser(h.engineRegistry.PopAll()).Close()
+	es, _ := h.engineRegistry.PopAll()
+	return services.MultiCloser(es).Close()
 }
 
-func (h *eventHandler) Handle(ctx context.Context, event Event) error {
+func (h *eventHandler) HandleEvent(ctx context.Context, event Event) error {
 	switch event.GetEventType() {
 	case ForceUpdateSecretsEvent:
 		payload, ok := event.GetData().(WorkflowRegistryForceUpdateSecretsRequestedV1)
@@ -204,109 +205,136 @@ func (h *eventHandler) Handle(ctx context.Context, event Event) error {
 
 		h.lggr.Debugw("handled force update secrets events for URL hash", "urlHash", payload.SecretsURLHash)
 		return nil
-	case WorkflowRegisteredEvent:
-		payload, ok := event.GetData().(WorkflowRegistryWorkflowRegisteredV1)
-		if !ok {
-			return newHandlerTypeError(event.GetData())
-		}
-		wfID := hex.EncodeToString(payload.WorkflowID[:])
-
-		cma := h.emitter.With(
-			platform.KeyWorkflowID, wfID,
-			platform.KeyWorkflowName, payload.WorkflowName,
-			platform.KeyWorkflowOwner, hex.EncodeToString(payload.WorkflowOwner),
-		)
-
-		if err := h.workflowRegisteredEvent(ctx, payload); err != nil {
-			logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow registered event: %v", err), h.lggr)
-			return err
-		}
-
-		h.lggr.Debugw("handled workflow registration event", "workflowID", wfID)
-		return nil
-	case WorkflowUpdatedEvent:
-		payload, ok := event.GetData().(WorkflowRegistryWorkflowUpdatedV1)
-		if !ok {
-			return fmt.Errorf("invalid data type %T for event", event.GetData())
-		}
-
-		newWorkflowID := hex.EncodeToString(payload.NewWorkflowID[:])
-		cma := h.emitter.With(
-			platform.KeyWorkflowID, newWorkflowID,
-			platform.KeyWorkflowName, payload.WorkflowName,
-			platform.KeyWorkflowOwner, hex.EncodeToString(payload.WorkflowOwner),
-		)
-
-		if err := h.workflowUpdatedEvent(ctx, payload); err != nil {
-			logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow updated event: %v", err), h.lggr)
-			return err
-		}
-
-		h.lggr.Debugw("handled workflow updated event", "workflowID", newWorkflowID)
-		return nil
-	case WorkflowPausedEvent:
-		payload, ok := event.GetData().(WorkflowRegistryWorkflowPausedV1)
-		if !ok {
-			return fmt.Errorf("invalid data type %T for event", event.GetData())
-		}
-
-		wfID := hex.EncodeToString(payload.WorkflowID[:])
-
-		cma := h.emitter.With(
-			platform.KeyWorkflowID, wfID,
-			platform.KeyWorkflowName, payload.WorkflowName,
-			platform.KeyWorkflowOwner, hex.EncodeToString(payload.WorkflowOwner),
-		)
-
-		if err := h.workflowPausedEvent(ctx, payload); err != nil {
-			logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow paused event: %v", err), h.lggr)
-			return err
-		}
-		h.lggr.Debugw("handled workflow paused event", "workflowID", wfID)
-		return nil
-	case WorkflowActivatedEvent:
-		payload, ok := event.GetData().(WorkflowRegistryWorkflowActivatedV1)
-		if !ok {
-			return fmt.Errorf("invalid data type %T for event", event.GetData())
-		}
-
-		wfID := hex.EncodeToString(payload.WorkflowID[:])
-
-		cma := h.emitter.With(
-			platform.KeyWorkflowID, wfID,
-			platform.KeyWorkflowName, payload.WorkflowName,
-			platform.KeyWorkflowOwner, hex.EncodeToString(payload.WorkflowOwner),
-		)
-		if err := h.workflowActivatedEvent(ctx, payload); err != nil {
-			logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow activated event: %v", err), h.lggr)
-			return err
-		}
-
-		h.lggr.Debugw("handled workflow activated event", "workflowID", wfID)
-		return nil
-	case WorkflowDeletedEvent:
-		payload, ok := event.GetData().(WorkflowRegistryWorkflowDeletedV1)
-		if !ok {
-			return fmt.Errorf("invalid data type %T for event", event.GetData())
-		}
-
-		wfID := hex.EncodeToString(payload.WorkflowID[:])
-
-		cma := h.emitter.With(
-			platform.KeyWorkflowID, wfID,
-			platform.KeyWorkflowName, payload.WorkflowName,
-			platform.KeyWorkflowOwner, hex.EncodeToString(payload.WorkflowOwner),
-		)
-
-		if err := h.workflowDeletedEvent(ctx, payload); err != nil {
-			logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow deleted event: %v", err), h.lggr)
-			return err
-		}
-
-		h.lggr.Debugw("handled workflow deleted event", "workflowID", wfID)
-		return nil
 	default:
 		return fmt.Errorf("event type unsupported: %v", event.GetEventType())
+	}
+}
+
+// HandleWorkflowMetadata compares the latest contract state for workflow metadata
+// against what is currently running on the node via the engine registry
+func (h *eventHandler) HandleWorkflowMetadata(ctx context.Context, state []GetWorkflowMetadata) {
+	// Keep track of which engines we have processed.
+	// Any unprocessed engines will be shut down.
+	engineKeys := h.engineRegistry.GetAllKeys()
+	engineIDMap := map[EngineKey]bool{}
+	for _, engineID := range engineKeys {
+		engineIDMap[engineID] = true
+	}
+
+	for _, wfMeta := range state {
+		engineKey := h.engineRegistry.KeyFor(wfMeta.Owner, wfMeta.WorkflowName)
+		engine, engineMeta, _ := h.engineRegistry.Get(engineKey)
+		readyErr := engine.Ready()
+		isRunning := false
+		if readyErr != nil {
+			isRunning = true
+		}
+		prevWfID := hex.EncodeToString(engineMeta.WorkflowID[:])
+		currWfID := hex.EncodeToString(wfMeta.WorkflowID[:])
+
+		cma := h.emitter.With(
+			platform.KeyWorkflowID, currWfID,
+			platform.KeyWorkflowName, wfMeta.WorkflowName,
+			platform.KeyWorkflowOwner, hex.EncodeToString(wfMeta.Owner),
+		)
+
+		// if the metadata entry has an active status & there is no engine in the engine registry
+		// then create a new workflow engine
+		if wfMeta.Status == 0 && !isRunning {
+			err := h.workflowRegisteredEvent(ctx, WorkflowRegistryWorkflowRegisteredV1{
+				WorkflowID:    wfMeta.WorkflowID,
+				WorkflowOwner: wfMeta.Owner,
+				DonID:         wfMeta.DonID,
+				Status:        wfMeta.Status,
+				WorkflowName:  wfMeta.WorkflowName,
+				BinaryURL:     wfMeta.BinaryURL,
+				ConfigURL:     wfMeta.ConfigURL,
+				SecretsURL:    wfMeta.SecretsURL,
+			})
+			if err != nil {
+				logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow registered event: %v", err), h.lggr)
+			} else {
+				h.lggr.Debugw("handled workflow registration event", "workflowID", currWfID)
+			}
+
+			delete(engineIDMap, engineKey)
+			continue
+		}
+
+		// if the metadata entry has a paused & there is an engine in the engine registry
+		// then delete the running workflow engine
+		if wfMeta.Status == 1 && isRunning {
+			err := h.workflowPausedEvent(ctx, WorkflowRegistryWorkflowPausedV1{
+				WorkflowID:    wfMeta.WorkflowID,
+				WorkflowOwner: wfMeta.Owner,
+				DonID:         wfMeta.DonID,
+				WorkflowName:  wfMeta.WorkflowName,
+			})
+
+			if err != nil {
+				logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow paused event: %v", err), h.lggr)
+			} else {
+				h.lggr.Debugw("handled workflow paused event", "workflowID", currWfID)
+			}
+
+			delete(engineIDMap, engineKey)
+			continue
+		}
+
+		// if the metadata entry has status 0 (active) & the workflow engine metadata is the same
+		// NOOP. Continue to next.
+		if wfMeta.Status == 0 && isRunning && currWfID == prevWfID {
+			delete(engineIDMap, engineKey)
+			continue
+		}
+
+		// if the metadata entry has status 0 (active) & the workflow engine is running & the metadata has changed
+		// stop old one + register new one
+		if wfMeta.Status == 0 && isRunning && currWfID != prevWfID {
+			err := h.workflowUpdatedEvent(ctx, WorkflowRegistryWorkflowUpdatedV1{
+				OldWorkflowID: engineMeta.WorkflowID,
+				NewWorkflowID: wfMeta.WorkflowID,
+				WorkflowOwner: wfMeta.Owner,
+				DonID:         wfMeta.DonID,
+				WorkflowName:  wfMeta.WorkflowName,
+				BinaryURL:     wfMeta.BinaryURL,
+				ConfigURL:     wfMeta.ConfigURL,
+				SecretsURL:    wfMeta.SecretsURL,
+			})
+
+			if err != nil {
+				logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow updated event: %v", err), h.lggr)
+			} else {
+				h.lggr.Debugw("handled workflow updated event", "workflowID", currWfID)
+			}
+
+			delete(engineIDMap, engineKey)
+			continue
+		}
+	}
+
+	// Shut down engines that are no longer in the latest contract workflow metadata
+	for engineKey, _ := range engineIDMap {
+		_, engineMeta, _ := h.engineRegistry.Get(engineKey)
+		wfID := hex.EncodeToString(engineMeta.WorkflowID[:])
+		cma := h.emitter.With(
+			platform.KeyWorkflowID, wfID,
+			platform.KeyWorkflowName, engineMeta.WorkflowName,
+			platform.KeyWorkflowOwner, hex.EncodeToString(engineMeta.Owner),
+		)
+
+		err := h.workflowDeletedEvent(ctx, WorkflowRegistryWorkflowDeletedV1{
+			WorkflowID:    engineMeta.WorkflowID,
+			WorkflowOwner: engineMeta.Owner,
+			DonID:         engineMeta.DonID,
+			WorkflowName:  engineMeta.WorkflowName,
+		})
+
+		if err != nil {
+			logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow deleted event: %v", err), h.lggr)
+		} else {
+			h.lggr.Debugw("handled workflow deleted event", "workflowID", wfID)
+		}
 	}
 }
 
@@ -359,7 +387,8 @@ func (h *eventHandler) workflowRegisteredEvent(
 	}
 
 	// Ensure that there is no running workflow engine for the given workflow ID.
-	if h.engineRegistry.Contains(hex.EncodeToString(payload.WorkflowID[:])) {
+	engineKey := h.engineRegistry.KeyFor(payload.WorkflowOwner, payload.WorkflowName)
+	if h.engineRegistry.Contains(engineKey) {
 		return fmt.Errorf("workflow is already running, so not starting it : %s", hex.EncodeToString(payload.WorkflowID[:]))
 	}
 
@@ -417,9 +446,18 @@ func (h *eventHandler) workflowRegisteredEvent(
 		return fmt.Errorf("failed to start workflow engine: %w", err)
 	}
 
-	// This shouldn't fail because we call the handler serially and
+	// This shouldn't happen because we call the handler serially and
 	// check for running engines above, see the call to engineRegistry.Contains.
-	if err := h.engineRegistry.Add(wfID, engine); err != nil {
+	if err := h.engineRegistry.Add(engineKey, engine, GetWorkflowMetadata{
+		WorkflowID:   payload.WorkflowID,
+		Owner:        payload.WorkflowOwner,
+		DonID:        payload.DonID,
+		Status:       payload.Status,
+		WorkflowName: payload.WorkflowName,
+		BinaryURL:    payload.BinaryURL,
+		ConfigURL:    payload.ConfigURL,
+		SecretsURL:   payload.SecretsURL,
+	}); err != nil {
 		return fmt.Errorf("invariant violation: %w", err)
 	}
 
@@ -469,7 +507,7 @@ func (h *eventHandler) workflowUpdatedEvent(
 	payload WorkflowRegistryWorkflowUpdatedV1,
 ) error {
 	// Remove the old workflow engine from the local registry if it exists
-	if err := h.tryEngineCleanup(hex.EncodeToString(payload.OldWorkflowID[:])); err != nil {
+	if err := h.tryEngineCleanup(payload.WorkflowOwner, payload.WorkflowName); err != nil {
 		return err
 	}
 
@@ -493,7 +531,7 @@ func (h *eventHandler) workflowPausedEvent(
 	payload WorkflowRegistryWorkflowPausedV1,
 ) error {
 	// Remove the workflow engine from the local registry if it exists
-	if err := h.tryEngineCleanup(hex.EncodeToString(payload.WorkflowID[:])); err != nil {
+	if err := h.tryEngineCleanup(payload.WorkflowOwner, payload.WorkflowName); err != nil {
 		return err
 	}
 
@@ -524,7 +562,8 @@ func (h *eventHandler) workflowActivatedEvent(
 	}
 
 	// Do nothing if the workflow is already active
-	if spec.Status == job.WorkflowSpecStatusActive && h.engineRegistry.Contains(hex.EncodeToString(payload.WorkflowID[:])) {
+	engineKey := h.engineRegistry.KeyFor(payload.WorkflowOwner, payload.WorkflowName)
+	if spec.Status == job.WorkflowSpecStatusActive && h.engineRegistry.Contains(engineKey) {
 		return nil
 	}
 
@@ -554,14 +593,12 @@ func (h *eventHandler) workflowDeletedEvent(
 	ctx context.Context,
 	payload WorkflowRegistryWorkflowDeletedV1,
 ) error {
-	workflowID := hex.EncodeToString(payload.WorkflowID[:])
-
-	if err := h.tryEngineCleanup(workflowID); err != nil {
+	if err := h.tryEngineCleanup(payload.WorkflowOwner, payload.WorkflowName); err != nil {
 		return err
 	}
 
 	if err := h.workflowArtifactsStore.DeleteWorkflowArtifacts(ctx, hex.EncodeToString(payload.WorkflowOwner),
-		payload.WorkflowName, workflowID); err != nil {
+		payload.WorkflowName, hex.EncodeToString(payload.WorkflowID[:])); err != nil {
 		return fmt.Errorf("failed to delete workflow artifacts: %w", err)
 	}
 
@@ -570,10 +607,11 @@ func (h *eventHandler) workflowDeletedEvent(
 
 // tryEngineCleanup attempts to stop the workflow engine for the given workflow ID.  Does nothing if the
 // workflow engine is not running.
-func (h *eventHandler) tryEngineCleanup(wfID string) error {
-	if h.engineRegistry.Contains(wfID) {
+func (h *eventHandler) tryEngineCleanup(workflowOwner []byte, workflowName string) error {
+	engineKey := h.engineRegistry.KeyFor(workflowOwner, workflowName)
+	if h.engineRegistry.Contains(engineKey) {
 		// Remove the engine from the registry
-		e, err := h.engineRegistry.Pop(wfID)
+		e, _, err := h.engineRegistry.Pop(engineKey)
 		if err != nil {
 			return fmt.Errorf("failed to get workflow engine: %w", err)
 		}

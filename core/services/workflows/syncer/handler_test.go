@@ -136,7 +136,7 @@ func Test_Handler(t *testing.T) {
 
 		h := NewEventHandler(lggr, nil, nil, emitter, rl, workflowLimits, store)
 
-		err = h.Handle(ctx, giveEvent)
+		err = h.HandleEvent(ctx, giveEvent)
 		require.NoError(t, err)
 	})
 
@@ -158,7 +158,7 @@ func Test_Handler(t *testing.T) {
 
 		h := NewEventHandler(lggr, nil, nil, emitter, rl, workflowLimits, store)
 
-		err = h.Handle(ctx, giveEvent)
+		err = h.HandleEvent(ctx, giveEvent)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "event type unsupported")
 	})
@@ -189,7 +189,7 @@ func Test_Handler(t *testing.T) {
 			},
 		}
 		mockORM.EXPECT().GetSecretsURLByHash(matches.AnyContext, giveHash).Return("", assert.AnError)
-		err = h.Handle(ctx, giveEvent)
+		err = h.HandleEvent(ctx, giveEvent)
 		require.Error(t, err)
 		require.ErrorContains(t, err, assert.AnError.Error())
 	})
@@ -224,9 +224,7 @@ func Test_Handler(t *testing.T) {
 		store := artifacts.NewStoreWithDecryptSecretsFn(lggr, mockORM, fetcher, clockwork.NewFakeClock(), workflowkey.Key{}, custmsg.NewLabeler(), decrypter.decryptSecrets)
 
 		h := NewEventHandler(lggr, nil, nil, emitter, rl, workflowLimits, store)
-
-		err = h.Handle(ctx, giveEvent)
-		require.Error(t, err)
+		err = h.HandleEvent(ctx, giveEvent)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 
@@ -262,7 +260,8 @@ func Test_Handler(t *testing.T) {
 
 		h := NewEventHandler(lggr, nil, nil, emitter, rl, workflowLimits, store)
 
-		err = h.Handle(ctx, giveEvent)
+		err = h.HandleEvent(ctx, giveEvent)
+
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -295,7 +294,8 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 		require.Equal(t, job.WorkflowSpecStatusActive, dbSpec.Status)
 
 		// Verify the engine is started
-		engine, err := h.engineRegistry.Get(wfID)
+		engineKey := h.engineRegistry.KeyFor(wfOwner, workflowName)
+		engine, _, err := h.engineRegistry.Get(engineKey)
 		require.NoError(t, err)
 		err = engine.Ready()
 		require.NoError(t, err)
@@ -427,7 +427,8 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 			},
 			validationFn: func(t *testing.T, ctx context.Context, event WorkflowRegistryWorkflowRegisteredV1, h *eventHandler, s *artifacts.Store, wfOwner []byte, wfName string, wfID string) {
 				me := &mockEngine{}
-				h.engineRegistry.Add(wfID, me)
+				engineKey := h.engineRegistry.KeyFor(wfOwner, workflowName)
+				h.engineRegistry.Add(engineKey, me, GetWorkflowMetadata{})
 				err := h.workflowRegisteredEvent(ctx, event)
 				require.Error(t, err)
 				require.ErrorContains(t, err, "workflow is already running")
@@ -470,7 +471,8 @@ func Test_workflowRegisteredHandler(t *testing.T) {
 				require.Equal(t, job.WorkflowSpecStatusPaused, dbSpec.Status)
 
 				// Verify there is no running engine
-				_, err = h.engineRegistry.Get(wfID)
+				engineKey := h.engineRegistry.KeyFor(wfOwner, workflowName)
+				_, _, err = h.engineRegistry.Get(engineKey)
 				require.Error(t, err)
 			},
 		},
@@ -619,7 +621,6 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		giveWFID, err := pkgworkflows.GenerateWorkflowID(wfOwner, "workflow-name", binary, config, secretsURL)
 
 		require.NoError(t, err)
-		wfIDs := hex.EncodeToString(giveWFID[:])
 
 		active := WorkflowRegistryWorkflowRegisteredV1{
 			Status:        uint8(0),
@@ -655,7 +656,8 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		require.Equal(t, job.WorkflowSpecStatusActive, dbSpec.Status)
 
 		// Verify the engine is started
-		engine, err := h.engineRegistry.Get(wfIDs)
+		engineKey := h.engineRegistry.KeyFor(wfOwner, "workflow-name")
+		engine, _, err := h.engineRegistry.Get(engineKey)
 		require.NoError(t, err)
 		err = engine.Ready()
 		require.NoError(t, err)
@@ -674,7 +676,7 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		require.Error(t, err)
 
 		// Verify the engine is deleted
-		_, err = h.engineRegistry.Get(wfIDs)
+		_, _, err = h.engineRegistry.Get(engineKey)
 		require.Error(t, err)
 	})
 	t.Run("success deleting non-existing workflow spec", func(t *testing.T) {
@@ -762,11 +764,6 @@ func Test_workflowPausedActivatedUpdatedHandler(t *testing.T) {
 		require.NoError(t, err)
 		updatedWFID, err := pkgworkflows.GenerateWorkflowID(wfOwner, "workflow-name", binary, updateConfig, secretsURL)
 		require.NoError(t, err)
-
-		require.NoError(t, err)
-		wfIDs := hex.EncodeToString(giveWFID[:])
-
-		require.NoError(t, err)
 		newWFIDs := hex.EncodeToString(updatedWFID[:])
 
 		active := WorkflowRegistryWorkflowRegisteredV1{
@@ -804,7 +801,8 @@ func Test_workflowPausedActivatedUpdatedHandler(t *testing.T) {
 		require.Equal(t, job.WorkflowSpecStatusActive, dbSpec.Status)
 
 		// Verify the engine is started
-		engine, err := h.engineRegistry.Get(wfIDs)
+		engineKey := h.engineRegistry.KeyFor(wfOwner, "workflow-name")
+		engine, _, err := h.engineRegistry.Get(engineKey)
 		require.NoError(t, err)
 		err = engine.Ready()
 		require.NoError(t, err)
@@ -827,7 +825,7 @@ func Test_workflowPausedActivatedUpdatedHandler(t *testing.T) {
 		require.Equal(t, job.WorkflowSpecStatusPaused, dbSpec.Status)
 
 		// Verify the engine is removed
-		_, err = h.engineRegistry.Get(wfIDs)
+		_, _, err = h.engineRegistry.Get(engineKey)
 		require.Error(t, err)
 
 		// create an activated workflow event
@@ -849,7 +847,7 @@ func Test_workflowPausedActivatedUpdatedHandler(t *testing.T) {
 		require.Equal(t, job.WorkflowSpecStatusActive, dbSpec.Status)
 
 		// Verify the engine is started
-		engine, err = h.engineRegistry.Get(wfIDs)
+		engine, _, err = h.engineRegistry.Get(engineKey)
 		require.NoError(t, err)
 		err = engine.Ready()
 		require.NoError(t, err)
@@ -879,11 +877,11 @@ func Test_workflowPausedActivatedUpdatedHandler(t *testing.T) {
 		require.Equal(t, string(updateConfig), dbSpec.Config)
 
 		// old engine is no longer running
-		_, err = h.engineRegistry.Get(wfIDs)
+		_, _, err = h.engineRegistry.Get(engineKey)
 		require.Error(t, err)
 
 		// new engine is started
-		engine, err = h.engineRegistry.Get(newWFIDs)
+		engine, _, err = h.engineRegistry.Get(engineKey)
 		require.NoError(t, err)
 		err = engine.Ready()
 		require.NoError(t, err)
