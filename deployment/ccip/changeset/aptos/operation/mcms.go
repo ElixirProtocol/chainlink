@@ -22,11 +22,13 @@ const MCMSPackageName string = "mcms" // TODO: this should be a constant importe
 const AcceptOwnershipProposalDescription = "Accept ownership of the contract to self"
 
 type MCMSDeploymentOperations struct {
-	Env         deployment.Environment
-	Ab          *deployment.AddressBookMap
-	AptosChain  deployment.AptosChain
-	MCMSConfigs mcmstypes.Config
-	Proposals   *[]mcms.Proposal
+	Env          deployment.Environment
+	Ab           *deployment.AddressBookMap
+	AptosChain   deployment.AptosChain
+	OnChainState changeset.AptosCCIPChainState
+	MCMSConfigs  mcmstypes.Config
+	Proposals    *[]mcms.Proposal
+	MCMSOpCount  uint64
 }
 
 func (op *MCMSDeploymentOperations) DeployMCMS() (aptos.AccountAddress, mcmsbind.MCMS, error) {
@@ -41,6 +43,7 @@ func (op *MCMSDeploymentOperations) DeployMCMS() (aptos.AccountAddress, mcmsbind
 
 	typeAndVersion := deployment.NewTypeAndVersion(changeset.AptosMCMSType, deployment.Version1_0_0)
 	op.Ab.Save(op.AptosChain.Selector, addressMCMS.String(), typeAndVersion)
+	op.OnChainState.MCMSAddress = addressMCMS
 	return addressMCMS, contractMCMS, nil
 }
 

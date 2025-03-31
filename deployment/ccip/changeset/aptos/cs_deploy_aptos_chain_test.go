@@ -148,43 +148,32 @@ func TestCsDeployAptosChain_Apply(t *testing.T) {
 	lggr := logger.TestLogger(t)
 
 	// Setup memory environment with 1 Aptos chain
-	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
+	env := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		AptosChains: 1,
 	})
 
 	// Get chain selectors
-	aptosChainSelectors := e.AllChainSelectorsAptos()
+	aptosChainSelectors := env.AllChainSelectorsAptos()
 	require.Equal(t, 1, len(aptosChainSelectors), "Expected exactly 1 Aptos chain")
 	chainSelector := aptosChainSelectors[0]
-	t.Log("Deployer: ", e.AptosChains[chainSelector].DeployerSigner)
-
-	// Deploy MCMS
-	mcmsConfig := proposalutils.SingleGroupMCMSV2(t)
-	mcmsDeployConfig := DeployAptosMCMSConfig{
-		MCMSConfigPerChain: map[uint64]mcmstypes.Config{
-			chainSelector: mcmsConfig,
-		},
-	}
-
-	e, err := commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
-		commonchangeset.Configure(CsDeployAptosMCMS, mcmsDeployConfig),
-	})
-	require.NoError(t, err)
+	t.Log("Deployer: ", env.AptosChains[chainSelector].DeployerSigner)
 
 	// Deploy CCIP to Aptos chain
 	ccipConfig := DeployAptosChainConfig{
 		ContractParamsPerChain: map[uint64]ChainContractParams{
 			chainSelector: getMockChainContractParams(t, chainSelector),
 		},
+		MCMSConfigPerChain: map[uint64]mcmstypes.Config{
+			chainSelector: proposalutils.SingleGroupMCMSV2(t),
+		},
 	}
-
-	e, err = commonchangeset.ApplyChangesetsV2(t, e, []commonchangeset.ConfiguredChangeSet{
+	env, err := commonchangeset.ApplyChangesetsV2(t, env, []commonchangeset.ConfiguredChangeSet{
 		commonchangeset.Configure(CsDeployAptosChain, ccipConfig),
 	})
 	require.NoError(t, err)
 
 	// Verify CCIP deployment state by binding ccip contract and checking if it's deployed
-	state, err := changeset.LoadOnchainStateAptos(e)
+	state, err := changeset.LoadOnchainStateAptos(env)
 	require.NoError(t, err)
 	require.NotNil(t, state[chainSelector], "No state found for chain")
 
@@ -192,7 +181,7 @@ func TestCsDeployAptosChain_Apply(t *testing.T) {
 	require.NotEmpty(t, ccipAddr, "CCIP address should not be empty")
 
 	// Bind CCIP contract
-	ccipContract := ccipbind.Bind(ccipAddr, e.AptosChains[chainSelector].Client)
+	ccipContract := ccipbind.Bind(ccipAddr, env.AptosChains[chainSelector].Client)
 	ownerAddr, err := ccipContract.Auth().Owner(nil)
 	require.NoError(t, err)
 	require.NotEqual(t, aptos.AccountAddress{}, ownerAddr, "MCMS must own CCIP contract")

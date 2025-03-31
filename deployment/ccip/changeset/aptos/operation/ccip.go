@@ -101,6 +101,7 @@ func (op *CCIPDeploymentOperations) GenerateDeployCCIPProposal() (*aptos.Account
 	// Save the address of the CCIP object
 	typeAndVersion := deployment.NewTypeAndVersion(changeset.AptosCCIPType, deployment.Version1_0_0)
 	op.Ab.Save(op.AptosChain.Selector, ccipObjectAddress.String(), typeAndVersion)
+	op.OnChainState.CCIPAddress = ccipObjectAddress
 
 	// Generate deploy proposal
 	proposal, nextOpCount, err := utils.GenerateProposal(op.AptosChain.Client, mcmsContract.Address(), op.AptosChain.Selector, operations, "Deploy CCIP Package", op.MCMSOpCount)
