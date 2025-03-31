@@ -577,7 +577,7 @@ func testRunningWorkflow(t *testing.T, tc testCase) {
 			opts = append(opts, WithEngineFactoryFn(tc.engineFactoryFn))
 		}
 
-		store := wfstore.NewDBStore(db, lggr, clockwork.NewFakeClock())
+		store := wfstore.NewInMemoryStore(lggr, clockwork.NewFakeClock())
 		registry := capabilities.NewRegistry(lggr)
 		registry.SetLocalRegistry(&capabilities.TestMetadataRegistry{})
 		rl, err := ratelimiter.NewRateLimiter(rlConfig)
@@ -633,7 +633,7 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		}
 
 		er := NewEngineRegistry()
-		store := wfstore.NewDBStore(db, lggr, clockwork.NewFakeClock())
+		store := wfstore.NewInMemoryStore(lggr, clockwork.NewFakeClock())
 		registry := capabilities.NewRegistry(lggr)
 		registry.SetLocalRegistry(&capabilities.TestMetadataRegistry{})
 		rl, err := ratelimiter.NewRateLimiter(rlConfig)
@@ -706,7 +706,7 @@ func Test_workflowDeletedHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		er := NewEngineRegistry()
-		store := wfstore.NewDBStore(db, lggr, clockwork.NewFakeClock())
+		store := wfstore.NewInMemoryStore(lggr, clockwork.NewFakeClock())
 		registry := capabilities.NewRegistry(lggr)
 		registry.SetLocalRegistry(&capabilities.TestMetadataRegistry{})
 		rl, err := ratelimiter.NewRateLimiter(rlConfig)
@@ -777,7 +777,7 @@ func Test_workflowPausedActivatedUpdatedHandler(t *testing.T) {
 		}
 
 		er := NewEngineRegistry()
-		store := wfstore.NewDBStore(db, lggr, clockwork.NewFakeClock())
+		store := wfstore.NewInMemoryStore(lggr, clockwork.NewFakeClock())
 		registry := capabilities.NewRegistry(lggr)
 		registry.SetLocalRegistry(&capabilities.TestMetadataRegistry{})
 		rl, err := ratelimiter.NewRateLimiter(rlConfig)

@@ -152,7 +152,7 @@ func WithTicker(ticker <-chan time.Time) func(*workflowRegistry) {
 type evtHandler interface {
 	io.Closer
 	HandleEvent(ctx context.Context, event Event) error
-	HandleWorkflowMeta(ctx context.Context, latestState []GetWorkflowMetadata)
+	HandleWorkflowMetadata(ctx context.Context, latestState []GetWorkflowMetadata)
 }
 
 type donNotifier interface {
