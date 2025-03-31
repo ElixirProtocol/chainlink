@@ -10,8 +10,8 @@ import (
 
 // DeployAptosChainConfig is a configuration for deploying CCIP Package for Aptos chains
 type DeployAptosChainConfig struct {
-	ContractParamsPerChain map[uint64]ChainContractParams
 	MCMSConfigPerChain     map[uint64]mcmstypes.Config
+	ContractParamsPerChain map[uint64]ChainContractParams
 }
 
 func (c DeployAptosChainConfig) Validate() error {

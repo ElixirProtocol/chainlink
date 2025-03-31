@@ -79,7 +79,7 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 					743186221051783445:  getMockChainContractParams(t, 743186221051783445),
 				},
 			},
-			wantErrRe: `env not found for chains: \[743186221051783445\]`,
+			wantErrRe: `chain 743186221051783445 not found in env`,
 			wantErr:   true,
 		},
 		{
@@ -95,36 +95,58 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 					1: {},
 				},
 			},
-			wantErrRe: "invalid DeployAptosChainConfig:",
+			wantErrRe: "invalid chain selector:",
 			wantErr:   true,
 		},
 		{
-			name: "error - missing MCMS contract for 2 chains",
+			name: "error - missing MCMS config for chain without MCMS deployed",
 			env: deployment.Environment{
 				Name:   "test",
 				Logger: logger.TestLogger(t),
 				AptosChains: map[uint64]deployment.AptosChain{
-					743186221051783445:  {},
 					4457093679053095497: {},
 				},
 				ExistingAddresses: getTestAddressBook(
 					map[uint64]map[string]deployment.TypeAndVersion{
-						4457093679053095497: {
-							mockAddress: {Type: "testType"},
-						},
-						743186221051783445: {
-							mockAddress: {Type: "testType"},
-						},
+						4457093679053095497: {}, // No MCMS address in state
 					},
 				),
 			},
 			config: DeployAptosChainConfig{
 				ContractParamsPerChain: map[uint64]ChainContractParams{
 					4457093679053095497: getMockChainContractParams(t, 4457093679053095497),
-					743186221051783445:  getMockChainContractParams(t, 743186221051783445),
+				},
+				// MCMSConfigPerChain is missing needed configs
+			},
+			wantErrRe: `invalid mcms configs for chain 4457093679053095497`,
+			wantErr:   true,
+		},
+		{
+			name: "error - invalid config for chain",
+			env: deployment.Environment{
+				Name:   "test",
+				Logger: logger.TestLogger(t),
+				AptosChains: map[uint64]deployment.AptosChain{
+					4457093679053095497: {},
+				},
+				ExistingAddresses: getTestAddressBook(
+					map[uint64]map[string]deployment.TypeAndVersion{
+						4457093679053095497: {
+							mockMCMSAddress: {Type: changeset.AptosMCMSType}, // MCMS already deployed
+						},
+					},
+				),
+			},
+			config: DeployAptosChainConfig{
+				ContractParamsPerChain: map[uint64]ChainContractParams{
+					4457093679053095497: {
+						FeeQuoterParams: FeeQuoterParams{
+							TokenPriceStalenessThreshold: 0, // Invalid gas limit (assuming 0 is invalid)
+						},
+					},
 				},
 			},
-			wantErrRe: "MCMS contract not deployed for chains:.*(4457093679053095497.*743186221051783445|743186221051783445.*4457093679053095497).*",
+			wantErrRe: `invalid config for chain 4457093679053095497`,
 			wantErr:   true,
 		},
 	}
@@ -134,8 +156,9 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 			cs := CsDeployAptosChainImp{}
 			err := cs.VerifyPreconditions(tt.env, tt.config)
 			if tt.wantErr {
+				errStr := err.Error()
 				assert.Error(t, err)
-				assert.Regexp(t, tt.wantErrRe, err.Error())
+				assert.Regexp(t, tt.wantErrRe, errStr)
 			} else {
 				assert.NoError(t, err)
 			}

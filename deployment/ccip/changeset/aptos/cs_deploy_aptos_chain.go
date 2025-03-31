@@ -1,6 +1,7 @@
 package aptos
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aptos-labs/aptos-go-sdk"
@@ -17,38 +18,31 @@ var CsDeployAptosChain deployment.ChangeSetV2[DeployAptosChainConfig] = CsDeploy
 type CsDeployAptosChainImp struct{}
 
 func (cs CsDeployAptosChainImp) VerifyPreconditions(env deployment.Environment, config DeployAptosChainConfig) error {
-	// Validate configs
-	if err := config.Validate(); err != nil {
-		return fmt.Errorf("invalid DeployAptosChainConfig: %w", err)
-	}
 	// Validate env and prerequisite contracts
 	state, err := changeset.LoadOnchainStateAptos(env)
 	if err != nil {
 		return fmt.Errorf("failed to load existing onchain state: %w", err)
 	}
-	failedEnvChains := []uint64{}
-	failedPrereqChains := []uint64{}
+	var errs []error
 	for chainSel := range config.ContractParamsPerChain {
 		if _, ok := env.AptosChains[chainSel]; !ok {
-			failedEnvChains = append(failedEnvChains, chainSel)
+			errs = append(errs, fmt.Errorf("chain %d not found in env", chainSel))
 		}
-		_, ok := state[chainSel]
-		// chainState, ok := state[chainSel]
-		// TODO: validate that either MCMSAddress or MCMSConfig is provided
-		// if !ok || chainState.MCMSAddress == (aptos.AccountAddress{}) {
+		chainState, ok := state[chainSel]
 		if !ok {
-			failedPrereqChains = append(failedPrereqChains, chainSel)
+			errs = append(errs, fmt.Errorf("chain %d not found in state", chainSel))
 		}
-	}
-	// If a chain is not in env it won't be in state, but these two checks are here to return clear errors
-	if len(failedEnvChains) > 0 {
-		return fmt.Errorf("env not found for chains: %v", failedEnvChains)
-	}
-	if len(failedPrereqChains) > 0 {
-		return fmt.Errorf("MCMS contract not deployed for chains: %v", failedPrereqChains)
+		if chainState.MCMSAddress == (aptos.AccountAddress{}) {
+			mcmsConfig := config.MCMSConfigPerChain[chainSel]
+			err = mcmsConfig.Validate()
+			errs = append(errs, fmt.Errorf("invalid mcms configs for chain %d: %w", chainSel, err))
+		}
+		if err := config.Validate(); err != nil {
+			errs = append(errs, fmt.Errorf("invalid config for chain %d: %w", chainSel, err))
+		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func (cs CsDeployAptosChainImp) Apply(env deployment.Environment, config DeployAptosChainConfig) (deployment.ChangesetOutput, error) {
