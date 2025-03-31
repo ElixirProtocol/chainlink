@@ -195,6 +195,10 @@ func generateDonJobSpecs(
 			jobSpecs = append(jobSpecs, jobs.WorkerOCR3(nodeID, oCR3CapabilityAddress, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainIDUint64))
 		}
 
+		if creflags.HasFlag(donWithMetadata.Flags, types.ReadContractCapability) {
+			jobSpecs = append(jobSpecs, jobs.WorkerStandardCapability(nodeID, fmt.Sprintf("read-contract-capability-%d", chainIDUint64), "/usr/local/bin/readcontract", fmt.Sprintf(`'{"chainId":%d,"network":"%s"}'`, chainIDUint64, "evm")))
+		}
+
 		// Insert custom jobs, test specific
 		if customJobsFn != nil {
 			jobSpecs, err = customJobsFn(jobSpecs, donWithMetadata)
