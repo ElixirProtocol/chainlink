@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/deployment"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,6 +15,8 @@ const (
 	mockCCIPAddress = "0xdccda7ae3917747b973a9d08609c328a37f9f8b44e4e00291be2fb58ae932bac"
 	mockAddress     = "0x13a9f1a109368730f2e355d831ba8fbf5942fb82321863d55de54cb4ebe5d18f"
 	mockBadAddress  = "0xinvalid"
+
+	mockMCMSSigner = "0x2A9685F653192edBac9F2405D95087c752fF6cd3"
 )
 
 func getTestAddressBook(addrByChain map[uint64]map[string]deployment.TypeAndVersion) deployment.AddressBook {
@@ -54,5 +58,14 @@ func getMockChainContractParams(t *testing.T, chainSelector uint64) ChainContrac
 			DestChainEnabled:          []bool{},
 			DestChainAllowlistEnabled: []bool{},
 		},
+	}
+}
+
+func getMockMCMSConfig(t *testing.T) mcmstypes.Config {
+	parsedAddress := common.HexToAddress(mockMCMSSigner)
+	return mcmstypes.Config{
+		Quorum:       1,
+		Signers:      []common.Address{parsedAddress},
+		GroupSigners: []mcmstypes.Config{},
 	}
 }

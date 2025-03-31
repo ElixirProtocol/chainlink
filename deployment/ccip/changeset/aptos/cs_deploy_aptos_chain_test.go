@@ -27,7 +27,30 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name: "success - valid config and state",
+			name: "success - valid configs",
+			env: deployment.Environment{
+				Name:   "test",
+				Logger: logger.TestLogger(t),
+				AptosChains: map[uint64]deployment.AptosChain{
+					743186221051783445:  {},
+					4457093679053095497: {},
+				},
+				ExistingAddresses: deployment.NewMemoryAddressBook(),
+			},
+			config: DeployAptosChainConfig{
+				ContractParamsPerChain: map[uint64]ChainContractParams{
+					4457093679053095497: getMockChainContractParams(t, 4457093679053095497),
+					743186221051783445:  getMockChainContractParams(t, 743186221051783445),
+				},
+				MCMSConfigPerChain: map[uint64]mcmstypes.Config{
+					4457093679053095497: getMockMCMSConfig(t),
+					743186221051783445:  getMockMCMSConfig(t),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "success - valid config w MCMS deployed",
 			env: deployment.Environment{
 				Name:   "test",
 				Logger: logger.TestLogger(t),
@@ -156,8 +179,8 @@ func TestCsDeployAptosChainImp_VerifyPreconditions(t *testing.T) {
 			cs := CsDeployAptosChainImp{}
 			err := cs.VerifyPreconditions(tt.env, tt.config)
 			if tt.wantErr {
-				errStr := err.Error()
 				assert.Error(t, err)
+				errStr := err.Error()
 				assert.Regexp(t, tt.wantErrRe, errStr)
 			} else {
 				assert.NoError(t, err)

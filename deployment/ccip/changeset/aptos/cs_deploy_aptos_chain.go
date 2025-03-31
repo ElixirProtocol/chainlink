@@ -25,6 +25,10 @@ func (cs CsDeployAptosChainImp) VerifyPreconditions(env deployment.Environment, 
 	}
 	var errs []error
 	for chainSel := range config.ContractParamsPerChain {
+		if err := config.Validate(); err != nil {
+			errs = append(errs, fmt.Errorf("invalid config for chain %d: %w", chainSel, err))
+			continue
+		}
 		if _, ok := env.AptosChains[chainSel]; !ok {
 			errs = append(errs, fmt.Errorf("chain %d not found in env", chainSel))
 		}
@@ -34,11 +38,9 @@ func (cs CsDeployAptosChainImp) VerifyPreconditions(env deployment.Environment, 
 		}
 		if chainState.MCMSAddress == (aptos.AccountAddress{}) {
 			mcmsConfig := config.MCMSConfigPerChain[chainSel]
-			err = mcmsConfig.Validate()
-			errs = append(errs, fmt.Errorf("invalid mcms configs for chain %d: %w", chainSel, err))
-		}
-		if err := config.Validate(); err != nil {
-			errs = append(errs, fmt.Errorf("invalid config for chain %d: %w", chainSel, err))
+			if err := mcmsConfig.Validate(); err != nil {
+				errs = append(errs, fmt.Errorf("invalid mcms configs for chain %d: %w", chainSel, err))
+			}
 		}
 	}
 
