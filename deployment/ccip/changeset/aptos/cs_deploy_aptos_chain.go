@@ -62,8 +62,6 @@ func (cs CsDeployAptosChainImp) Apply(env deployment.Environment, config config.
 		chainState := state[chainSel]
 		aptosChain := env.AptosChains[chainSel]
 
-		// TODO: Config home chain operations
-
 		// MCMS Deploy operations
 		opsMCMS := operation.MCMSDeploymentOperations{
 			Env:          env,
@@ -93,9 +91,6 @@ func (cs CsDeployAptosChainImp) Apply(env deployment.Environment, config config.
 		if err != nil {
 			return deployment.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP contracts for chain %d: %w", chainSel, err)
 		}
-
-		// TODO: Initialize contracts operations
-
 	}
 
 	return deployment.ChangesetOutput{
