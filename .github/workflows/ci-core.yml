@@ -205,7 +205,7 @@ jobs:
             os: ubuntu22.04-32cores-128GB
             os-self-hosted:
               - runs-on=${{ github.run_id }}
-              - runner=32core-256gb-large-ubuntu-r7iz-s3
+              - runner=64core-128gb-large-ubuntu-c7i-flex-s3
             build-solana-artifacts: 'true'
             should-run: ${{ needs.filter.outputs.should-run-deployment-tests }}
 

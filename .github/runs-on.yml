@@ -18,7 +18,7 @@ runners:
     image: ubuntu24-full-x64
     extras: [ "s3-cache"]
 
-  # Used for race tests
+  # Used for race tests / ccip deployment tests
   64core-128gb-large-ubuntu-c7i-flex-s3:
     cpu: 64
     ram: 128
