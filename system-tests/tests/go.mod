@@ -29,7 +29,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250327174912-c11ba1cf3682
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250325191518-036bb568a69d
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.5.8
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.6.8-0.20250401153926-de33f6c2191d
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.0
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.0
@@ -37,6 +37,7 @@ require (
 	github.com/smartcontractkit/libocr v0.0.0-20250328171017-609ec10a5510
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/sync v0.12.0
 	google.golang.org/grpc v1.70.0
 )
 
@@ -83,7 +84,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/atombender/go-jsonschema v0.16.1-0.20240916205339-a74cd4e2851c // indirect
 	github.com/avast/retry-go v3.0.0+incompatible // indirect
-	github.com/avast/retry-go/v4 v4.6.0 // indirect
+	github.com/avast/retry-go/v4 v4.6.1 // indirect
 	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
 	github.com/aws/aws-sdk-go v1.55.6 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.32.7 // indirect
@@ -411,7 +412,7 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
-	github.com/sethvargo/go-retry v0.2.4 // indirect
+	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.3 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
@@ -514,7 +515,6 @@ require (
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/net v0.37.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
-	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
