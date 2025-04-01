@@ -42,7 +42,8 @@ func (r ReportCodecCapabilityTrigger) Encode(report datastreamsllo.Report, cd ll
 		switch stream.(type) {
 		case nil:
 			// Missing observations are ignored
-			continue
+			// try assigning nil decimal value
+			// continue
 		case *datastreamsllo.Decimal:
 			var err error
 			d, err = stream.MarshalBinary()
