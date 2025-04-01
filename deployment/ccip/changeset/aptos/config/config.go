@@ -1,4 +1,4 @@
-package aptos
+package config
 
 import (
 	"fmt"
@@ -70,9 +70,10 @@ func (f FeeQuoterParams) Validate() error {
 type OffRampParams struct {
 	ChainSelector                    uint64
 	PermissionlessExecutionThreshold uint32
-	IsRMNVerificationDisabled        bool
+	IsRMNVerificationDisabled        []bool
 	SourceChainSelectors             []uint64
 	SourceChainIsEnabled             []bool
+	SourceChainsOnRamp               [][]byte
 }
 
 func (o OffRampParams) Validate() error {

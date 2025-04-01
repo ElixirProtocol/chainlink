@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip"
 	router "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_router"
 	mcmsbind "github.com/smartcontractkit/chainlink-aptos/bindings/mcms"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	aptoscfg "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/utils"
 	"github.com/smartcontractkit/mcms"
 	aptosmcms "github.com/smartcontractkit/mcms/sdk/aptos"
@@ -21,6 +23,7 @@ type CCIPDeploymentOperations struct {
 	Ab           *deployment.AddressBookMap
 	AptosChain   deployment.AptosChain
 	OnChainState changeset.AptosCCIPChainState
+	CCIPConfig   aptoscfg.ChainContractParams
 	Proposals    *[]mcms.Proposal
 	MCMSOpCount  uint64
 }
@@ -135,6 +138,90 @@ func (op *CCIPDeploymentOperations) GenerateDeployRouterProposal(ccipObjectAddre
 	return nil
 }
 
+func (op *CCIPDeploymentOperations) GenerateInitializeCCIPProposal(ccipObjectAddress *aptos.AccountAddress) error {
+	var operations []types.Operation
+	ccipBind := ccip.Bind(*ccipObjectAddress, op.AptosChain.Client)
+
+	// Config OnRamp
+	moduleInfo, function, _, args, err := ccipBind.Onramp().Encoder().Initialize(
+		op.AptosChain.Selector,
+		op.CCIPConfig.OnRampParams.AllowlistAdmin,
+		op.CCIPConfig.OnRampParams.DestChainSelectors,
+		op.CCIPConfig.OnRampParams.DestChainEnabled,
+		op.CCIPConfig.OnRampParams.DestChainAllowlistEnabled,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to encode onramp initialize: %w", err)
+	}
+	mcmsOp, err := generateMCMSOperation(op.AptosChain.Selector, ccipObjectAddress, moduleInfo, function, args)
+	if err != nil {
+		return fmt.Errorf("failed to generate MCMS operations for OnRamp Initialize: %w", err)
+	}
+	operations = append(operations, mcmsOp)
+
+	// Config OffRamp
+	moduleInfo, function, _, args, err = ccipBind.Offramp().Encoder().Initialize(
+		op.AptosChain.Selector,
+		op.CCIPConfig.OffRampParams.PermissionlessExecutionThreshold,
+		op.CCIPConfig.OffRampParams.SourceChainSelectors,
+		op.CCIPConfig.OffRampParams.SourceChainIsEnabled,
+		op.CCIPConfig.OffRampParams.IsRMNVerificationDisabled,
+		op.CCIPConfig.OffRampParams.SourceChainsOnRamp,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to encode offramp initialize: %w", err)
+	}
+	mcmsOp, err = generateMCMSOperation(op.AptosChain.Selector, ccipObjectAddress, moduleInfo, function, args)
+	if err != nil {
+		return fmt.Errorf("failed to generate MCMS operations for OffRamp Initialize: %w", err)
+	}
+	operations = append(operations, mcmsOp)
+
+	// Config FeeQuoter
+	moduleInfo, function, _, args, err = ccipBind.FeeQuoter().Encoder().Initialize(
+		op.AptosChain.Selector,
+		op.CCIPConfig.FeeQuoterParams.LinkToken,
+		op.CCIPConfig.FeeQuoterParams.TokenPriceStalenessThreshold,
+		op.CCIPConfig.FeeQuoterParams.FeeTokens,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to encode feequoter initialize: %w", err)
+	}
+	mcmsOp, err = generateMCMSOperation(op.AptosChain.Selector, ccipObjectAddress, moduleInfo, function, args)
+	if err != nil {
+		return fmt.Errorf("failed to generate MCMS operations for FeeQuoter Initialize: %w", err)
+	}
+	operations = append(operations, mcmsOp)
+
+	// Config RMNRemote
+	moduleInfo, function, _, args, err = ccipBind.RMNRemote().Encoder().Initialize(op.AptosChain.Selector)
+	if err != nil {
+		return fmt.Errorf("failed to encode rmnremote initialize: %w", err)
+	}
+	mcmsOp, err = generateMCMSOperation(op.AptosChain.Selector, ccipObjectAddress, moduleInfo, function, args)
+	if err != nil {
+		return fmt.Errorf("failed to generate MCMS operations for RMNRemote Initialize: %w", err)
+	}
+	operations = append(operations, mcmsOp)
+
+	// Generate config proposal
+	proposal, nextOpCount, err := utils.GenerateProposal(
+		op.AptosChain.Client,
+		op.OnChainState.MCMSAddress,
+		op.AptosChain.Selector,
+		operations,
+		"Initialize CCIP Package",
+		op.MCMSOpCount,
+	)
+	op.MCMSOpCount = nextOpCount
+	if err != nil {
+		return fmt.Errorf("failed to create deploy proposal: %w", err)
+	}
+	*op.Proposals = append(*op.Proposals, *proposal)
+
+	return nil
+}
+
 func (op *CCIPDeploymentOperations) getCCIPDeployOperations(mcmsContract mcmsbind.MCMS, chainSel uint64) (aptos.AccountAddress, []types.Operation, error) {
 	// Calculate addresses of the owner and the object
 	ccipObjectAddress, err := mcmsContract.MCMSRegistry().GetNewCodeObjectAddress(nil, []byte(ccip.DefaultSeed))
@@ -174,4 +261,24 @@ func (op *CCIPDeploymentOperations) getRouterDeployOperations(
 	}
 
 	return operations, nil
+}
+
+func generateMCMSOperation(chainSel uint64, toAddress *aptos.AccountAddress, moduleInfo bind.ModuleInformation, function string, args [][]byte) (types.Operation, error) {
+	additionalFields := aptosmcms.AdditionalFields{
+		PackageName: moduleInfo.PackageName,
+		ModuleName:  moduleInfo.ModuleName,
+		Function:    function,
+	}
+	afBytes, err := json.Marshal(additionalFields)
+	if err != nil {
+		return types.Operation{}, fmt.Errorf("failed to marshal additional fields: %w", err)
+	}
+	return types.Operation{
+		ChainSelector: types.ChainSelector(chainSel),
+		Transaction: types.Transaction{
+			To:               toAddress.StringLong(),
+			Data:             aptosmcms.ArgsToData(args),
+			AdditionalFields: afBytes,
+		},
+	}, nil
 }

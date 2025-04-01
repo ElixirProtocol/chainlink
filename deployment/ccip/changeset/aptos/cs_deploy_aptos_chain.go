@@ -8,16 +8,17 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/operation"
 	"github.com/smartcontractkit/mcms"
 )
 
 // CsDeployAptosChain deploys CCIP Package for Aptos chains
-var CsDeployAptosChain deployment.ChangeSetV2[DeployAptosChainConfig] = CsDeployAptosChainImp{}
+var CsDeployAptosChain deployment.ChangeSetV2[config.DeployAptosChainConfig] = CsDeployAptosChainImp{}
 
 type CsDeployAptosChainImp struct{}
 
-func (cs CsDeployAptosChainImp) VerifyPreconditions(env deployment.Environment, config DeployAptosChainConfig) error {
+func (cs CsDeployAptosChainImp) VerifyPreconditions(env deployment.Environment, config config.DeployAptosChainConfig) error {
 	// Validate env and prerequisite contracts
 	state, err := changeset.LoadOnchainStateAptos(env)
 	if err != nil {
@@ -47,7 +48,7 @@ func (cs CsDeployAptosChainImp) VerifyPreconditions(env deployment.Environment, 
 	return errors.Join(errs...)
 }
 
-func (cs CsDeployAptosChainImp) Apply(env deployment.Environment, config DeployAptosChainConfig) (deployment.ChangesetOutput, error) {
+func (cs CsDeployAptosChainImp) Apply(env deployment.Environment, config config.DeployAptosChainConfig) (deployment.ChangesetOutput, error) {
 	state, err := changeset.LoadOnchainStateAptos(env)
 	if err != nil {
 		return deployment.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
@@ -84,6 +85,7 @@ func (cs CsDeployAptosChainImp) Apply(env deployment.Environment, config DeployA
 			Ab:           ab,
 			AptosChain:   aptosChain,
 			OnChainState: opsMCMS.OnChainState,
+			CCIPConfig:   config.ContractParamsPerChain[chainSel],
 			Proposals:    proposals,
 			MCMSOpCount:  opsMCMS.MCMSOpCount,
 		}
@@ -149,6 +151,11 @@ func runCCIPDeployOperations(ops *operation.CCIPDeploymentOperations) error {
 	err = ops.GenerateDeployRouterProposal(ccipObjectAddress)
 	if err != nil {
 		return fmt.Errorf("failed to generate Router deploy proposal: %w", err)
+	}
+	// Generate proposals - Initialize CCIP package
+	err = ops.GenerateInitializeCCIPProposal(ccipObjectAddress)
+	if err != nil {
+		return fmt.Errorf("failed to generate CCIP initialize proposal: %w", err)
 	}
 
 	return nil
