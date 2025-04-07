@@ -21,8 +21,9 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    address minter
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, minter) {}
 
   /// @inheritdoc BurnMintTokenPoolAbstract
   function _burn(

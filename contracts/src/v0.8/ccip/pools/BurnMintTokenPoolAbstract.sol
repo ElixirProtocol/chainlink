@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
+import {IMinter} from "../interfaces/IMinter.sol";
 
 import {Pool} from "../libraries/Pool.sol";
 import {TokenPool} from "./TokenPool.sol";
@@ -43,7 +43,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
       _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
 
     // Mint to the receiver
-    IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
+    IMinter(address(minter)).mint(releaseOrMintIn.receiver, localAmount);
 
     emit Minted(msg.sender, releaseOrMintIn.receiver, localAmount);
 

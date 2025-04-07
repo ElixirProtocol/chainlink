@@ -39,8 +39,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     address[] memory allowlist,
     address rmnProxy,
     bool acceptLiquidity,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+    address router,
+    address minter
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, minter) {
     i_acceptLiquidity = acceptLiquidity;
   }
 
