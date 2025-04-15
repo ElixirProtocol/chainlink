@@ -17,6 +17,7 @@ block_timestamp = 1234567890
 block_number = 12345
 
 ignored_warnings_from = ["src"]
+fs_permissions = [{ access = "write", path = "./scripts/deploy/output/" }]
 
 [fmt]
 tab_width = 2
