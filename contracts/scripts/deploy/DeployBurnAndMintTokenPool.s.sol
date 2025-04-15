@@ -2,10 +2,13 @@
 pragma solidity 0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {BurnMintTokenPool} from "src/v0.8/ccip/pools/BurnMintTokenPool.sol";
+import {HelperUtils} from "./utils/HelperUtils.s.sol"; // Utility functions for JSON parsing and chain info
+import {HelperConfig} from "./HelperConfig.s.sol"; // Network configuration helper
+
+import {BurnFromMintTokenPool} from "src/v0.8/ccip/pools/BurnFromMintTokenPool.sol";
 import {IBurnMintERC20} from "src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 
-contract DeployBurnMintTokenPool is Script {
+contract DeployBurnFromMintTokenPool is Script {
     function run() external {
         // Get the chain name based on the current chain ID
         string memory chainName = HelperUtils.getChainName(block.chainid);
@@ -29,15 +32,21 @@ contract DeployBurnMintTokenPool is Script {
         // Cast the token address to the IBurnMintERC20 interface
         IBurnMintERC20 token = IBurnMintERC20(tokenAddress);
 
+        // Mainnet minting contract address
+        // address minter = 0x69088d25a635D22dcbe7c4A5C7707B9cc64bD114;
+        // Dev minting contract address
+        address minter = 0x6C5FfEB3507055aFc2461394c1AE8C1Fe2d870AB;
+
         vm.startBroadcast();
 
-        // Deploy the BurnMintTokenPool contract associated with the token
-        BurnMintTokenPool tokenPool = new BurnMintTokenPool(
+        // Deploy the BurnFromMintTokenPool contract associated with the token
+        BurnFromMintTokenPool tokenPool = new BurnFromMintTokenPool (
             token,
             18, // The number of decimals of the token
             new address[](0), // Empty array for initial operators
             rmnProxy,
-            router
+            router,
+            minter
         );
 
         console.log("Burn & Mint token pool deployed to:", address(tokenPool));
