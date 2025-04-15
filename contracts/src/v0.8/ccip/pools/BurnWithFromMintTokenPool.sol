@@ -23,8 +23,9 @@ contract BurnWithFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
+    address router,
+    address minter
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, minter) {
     // Some tokens allow burning from the sender without approval, but not all do.
     // To be safe, we approve the pool to burn from the pool.
     token.safeIncreaseAllowance(address(this), type(uint256).max);
