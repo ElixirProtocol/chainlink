@@ -15,8 +15,9 @@ contract TokenPoolHelper is TokenPool {
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    address minter
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, minter) {}
 
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn

@@ -16,6 +16,9 @@ gas_price = 1
 block_timestamp = 1234567890
 block_number = 12345
 
+ignored_warnings_from = ["src"]
+fs_permissions = [{ access = "read-write", path = "./" }]
+
 [fmt]
 tab_width = 2
 multiline_func_header = "params_first"

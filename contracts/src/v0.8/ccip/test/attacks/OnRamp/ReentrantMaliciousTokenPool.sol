@@ -16,8 +16,9 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     address facade,
     IERC20 token,
     address rmnProxy,
-    address router
-  ) TokenPool(token, 18, new address[](0), rmnProxy, router) {
+    address router,
+    address minter
+  ) TokenPool(token, 18, new address[](0), rmnProxy, router, minter) {
     i_facade = facade;
   }
 

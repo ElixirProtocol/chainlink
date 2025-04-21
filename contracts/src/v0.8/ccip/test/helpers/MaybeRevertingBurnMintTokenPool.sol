@@ -16,8 +16,9 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) BurnMintTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    address minter
+  ) BurnMintTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, minter) {}
 
   function setShouldRevert(
     bytes calldata revertReason

@@ -53,8 +53,9 @@ contract SiloedLockReleaseTokenPool is TokenPool, ITypeAndVersion {
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    address minter
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, minter) {}
 
   /// @notice Locks the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check

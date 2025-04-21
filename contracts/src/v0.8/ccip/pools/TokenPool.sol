@@ -120,8 +120,17 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
   /// @notice The address of the rate limiter admin.
   /// @dev Can be address(0) if none is configured.
   address internal s_rateLimitAdmin;
+  /// @notice The address of minter contract
+  address public minter;
 
-  constructor(IERC20 token, uint8 localTokenDecimals, address[] memory allowlist, address rmnProxy, address router) {
+  constructor(
+    IERC20 token,
+    uint8 localTokenDecimals,
+    address[] memory allowlist,
+    address rmnProxy,
+    address router,
+    address _minter
+  ) {
     if (address(token) == address(0) || router == address(0) || rmnProxy == address(0)) revert ZeroAddressNotAllowed();
     i_token = token;
     i_rmnProxy = rmnProxy;
@@ -137,6 +146,7 @@ abstract contract TokenPool is IPoolV1, Ownable2StepMsgSender {
     i_tokenDecimals = localTokenDecimals;
 
     s_router = IRouter(router);
+    minter = _minter;
 
     // Pool can be set as permissioned or permissionless at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;

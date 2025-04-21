@@ -18,8 +18,9 @@ contract BurnMintWithLockReleaseFlagTokenPool is BurnMintTokenPool {
     uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
-    address router
-  ) BurnMintTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {}
+    address router,
+    address minter
+  ) BurnMintTokenPool(token, localTokenDecimals, allowlist, rmnProxy, router, minter) {}
 
   /// @notice Mint tokens from the pool to the recipient
   /// @dev The _validateReleaseOrMint check is an essential security check
