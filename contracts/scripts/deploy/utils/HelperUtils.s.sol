@@ -17,7 +17,12 @@ library HelperUtils {
             return "arbitrumSepolia";
         } else if (chainId == 84532) {
             return "baseSepolia";
-        } else {
+        } else if (chainId == 1) {
+            return "ethereum";
+        } else if (chainId == 43114) {
+            return "avalanche";
+        }
+        else {
             revert("Unsupported chain ID");
         }
     }
@@ -35,6 +40,10 @@ library HelperUtils {
             return helperConfig.getArbitrumSepolia();
         } else if (chainId == 84532) {
             return helperConfig.getBaseSepoliaConfig();
+        } else if (chainId == 1) {
+            return helperConfig.getEthereumMainnetConfig();
+        } else if (chainId == 43114) {
+            return helperConfig.getAvalancheMainnetConfig();
         } else {
             revert("Unsupported chain ID");
         }

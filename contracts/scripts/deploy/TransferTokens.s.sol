@@ -22,7 +22,7 @@ contract TransferTokens is Script {
         // Construct paths to the configuration and token JSON files
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, "/scripts/deploy/config.json");
-        string memory tokenPath = string.concat(root, "/scripts/deploy/output/deployedToken_", chainName, ".json");
+        string memory tokenPath = string.concat(root, "/scripts/deploy/mainnet/output/deployedToken_", chainName, ".json");
 
 
         // Extract the token address from the JSON file

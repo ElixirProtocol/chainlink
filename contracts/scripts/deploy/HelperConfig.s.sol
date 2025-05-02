@@ -26,7 +26,39 @@ contract HelperConfig is Script {
             activeNetworkConfig = getAvalancheFujiConfig();
         } else if (block.chainid == 84532) {
             activeNetworkConfig = getBaseSepoliaConfig();
+        } else if (block.chainid == 1) {
+            activeNetworkConfig = getEthereumMainnetConfig();
+        } else if (block.chainid == 43114) {
+            activeNetworkConfig = getAvalancheMainnetConfig();
         }
+    }
+
+    function getEthereumMainnetConfig() public pure returns (NetworkConfig memory) {
+        NetworkConfig memory ethereumMainnetConfig = NetworkConfig({
+            chainSelector: 5009297550715157269,
+            router: 0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D,
+            rmnProxy: 0x411dE17f12D1A34ecC7F45f49844626267c75e81,
+            tokenAdminRegistry: 0xb22764f98dD05c789929716D677382Df22C05Cb6,
+            registryModuleOwnerCustom: 0x4855174E9479E211337832E109E7721d43A4CA64,
+            link: 0x514910771AF9Ca656af840dff83E8264EcF986CA,
+            confirmations: 7,
+            nativeCurrencySymbol: "ETH"
+        });
+        return ethereumMainnetConfig;
+    }
+
+    function getAvalancheMainnetConfig() public pure returns (NetworkConfig memory) {
+        NetworkConfig memory avalancheMainnetConfig = NetworkConfig({
+            chainSelector: 6433500567565415381,
+            router: 0xF4c7E640EdA248ef95972845a62bdC74237805dB,
+            rmnProxy: 0xcBD48A8eB077381c3c4Eb36b402d7283aB2b11Bc,
+            tokenAdminRegistry: 0xc8df5D618c6a59Cc6A311E96a39450381001464F,
+            registryModuleOwnerCustom: 0x76Aa17dCda9E8529149E76e9ffaE4aD1C4AD701B,
+            link: 0x5947BB275c521040051D82396192181b413227A3,
+            confirmations: 2,
+            nativeCurrencySymbol: "AVAX"
+        });
+        return avalancheMainnetConfig;
     }
 
     function getEthereumSepoliaConfig() public pure returns (NetworkConfig memory) {

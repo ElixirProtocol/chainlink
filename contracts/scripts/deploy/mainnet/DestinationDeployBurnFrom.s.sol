@@ -2,8 +2,8 @@
 pragma solidity 0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {HelperUtils} from "./utils/HelperUtils.s.sol"; // Utility functions for JSON parsing and chain info
-import {HelperConfig} from "./HelperConfig.s.sol"; // Network configuration helper
+import {HelperUtils} from "../utils/HelperUtils.s.sol"; // Utility functions for JSON parsing and chain info
+import {HelperConfig} from "../HelperConfig.s.sol"; // Network configuration helper
 
 import {BurnFromMintTokenPool} from "src/v0.8/ccip/pools/BurnFromMintTokenPool.sol";
 import {IBurnMintERC20} from "src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
@@ -16,9 +16,6 @@ import {RateLimiter} from "src/v0.8/ccip/libraries/RateLimiter.sol";
 contract DeployBurnFromMintTokenPoolDestination is Script {
     function run() external {
 
-        // Read caller information.
-        (, address deployer,) = vm.readCallers();
-
         // Get the chain name based on the current chain ID
         string memory chainName = HelperUtils.getChainName(block.chainid);
 
@@ -26,9 +23,7 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
         // string memory root = vm.projectRoot();
 
         // Mainnet
-        // address tokenAddress = ;
-        // Sepolia
-        address tokenAddress = 0x9516d5F1362F439a74963304E922e3A738D8CE02;
+        address tokenAddress = 0xB57B25851fE2311CC3fE511c8F10E868932e0680;
 
         // Fetch network configuration (router and RMN proxy addresses)
         HelperConfig helperConfig = new HelperConfig();
@@ -40,14 +35,15 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
 
         vm.startBroadcast();
 
-        // STEP 1
+        // Read caller information.
+        (, address deployer,) = vm.readCallers();
+
+        // // STEP 1
         // // Cast the token address to the IBurnMintERC20 interface
         // IBurnMintERC20 token = IBurnMintERC20(tokenAddress);
         //
         // // Mainnet minting contract address
-        // // address minter = 0x69088d25a635D22dcbe7c4A5C7707B9cc64bD114;
-        // // Dev minting contract address
-        // address minter = 0x9516d5F1362F439a74963304E922e3A738D8CE02;
+        // address minter = 0xB57B25851fE2311CC3fE511c8F10E868932e0680;
         //
         // // Deploy the BurnFromMintTokenPool contract associated with the token
         // BurnFromMintTokenPool tokenPool = new BurnFromMintTokenPool (
@@ -64,17 +60,17 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
         // // Grant mint and burn roles to the token pool on the token contract
         // // TODO:
         // console.log("Granted mint and burn roles to token pool:", address(tokenPool));
-
-        // // STEP 2
+        //
         // // Serialize and write the token pool address to a new JSON file
         // string memory jsonObj = "internal_key";
         // string memory key = string(abi.encodePacked("deployedTokenPool_", chainName));
-        // string memory finalJson = vm.serializeAddress(jsonObj, key, address(0x01805CD1300Bb37Eb61ff4780f6A70a0Ca4dE2bd));
+        // string memory finalJson = vm.serializeAddress(jsonObj, key, address(tokenPool));
         //
-        // string memory poolFileName = string(abi.encodePacked("./scripts/deploy/output/deployedTokenPool_", chainName, ".json"));
+        // string memory poolFileName = string(abi.encodePacked("./scripts/deploy/mainnet/output/deployedTokenPool_", chainName, ".json"));
         // console.log("Writing deployed token pool address to file:", poolFileName);
         // vm.writeJson(finalJson, poolFileName);
-        //
+
+        // // STEP 2
         // // Instantiate the registry contract
         // RegistryModuleOwnerCustom registryContract = RegistryModuleOwnerCustom(registryModuleOwnerCustom);
         //
@@ -103,7 +99,7 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
         // console.log("Accepted admin role for token:", tokenAddress);
 
         // // Step 4
-        // address poolAddress = 0x01805CD1300Bb37Eb61ff4780f6A70a0Ca4dE2bd;
+        // address poolAddress = 0x4ca21322011b2e881f8146069a999D085D68ba72;
         //
         // // Instantiate the TokenAdminRegistry contract
         // TokenAdminRegistry tokenAdminRegistryContract = TokenAdminRegistry(tokenAdminRegistry);
@@ -126,10 +122,10 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
 
 
         // Step 5
-        address poolAddress = 0x01805CD1300Bb37Eb61ff4780f6A70a0Ca4dE2bd;
-        address remotePoolAddress = 0x2dDf7716E27b144C979C98858f407C601716156b;
-        address remoteTokenAddress = 0xa6B08f1B0d894429Ed73fB68F0330318b188e2B0;
-        uint64 remoteChainId = 11155111;
+        address poolAddress = 0x4ca21322011b2e881f8146069a999D085D68ba72;
+        address remotePoolAddress = 0x1016225Ba7f32e3a6f2842A380D5846D8756648c;
+        address remoteTokenAddress = 0x15700B564Ca08D9439C58cA5053166E8317aa138;
+        uint64 remoteChainId = 1;
 
         // For remotePoolAddresses, create an array with the remotePoolAddress
         address[] memory remotePoolAddresses = new address[](1);

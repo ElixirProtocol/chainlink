@@ -2,8 +2,8 @@
 pragma solidity 0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {HelperUtils} from "./utils/HelperUtils.s.sol"; // Utility functions for JSON parsing and chain info
-import {HelperConfig} from "./HelperConfig.s.sol"; // Network configuration helper
+import {HelperUtils} from "../utils/HelperUtils.s.sol"; // Utility functions for JSON parsing and chain info
+import {HelperConfig} from "../HelperConfig.s.sol"; // Network configuration helper
 
 import {BurnFromMintTokenPool} from "src/v0.8/ccip/pools/BurnFromMintTokenPool.sol";
 import {IBurnMintERC20} from "src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
@@ -21,14 +21,13 @@ contract DeployBurnFromMintTokenPoolSource is Script {
 
         // Get the chain name based on the current chain ID
         string memory chainName = HelperUtils.getChainName(block.chainid);
+        console.log(chainName);
 
         // Construct the path to the deployed token JSON file
         // string memory root = vm.projectRoot();
 
         // Mainnet
-        // address tokenAddress = ;
-        // Sepolia
-        address tokenAddress = 0xa6B08f1B0d894429Ed73fB68F0330318b188e2B0;
+        address tokenAddress = 0x15700B564Ca08D9439C58cA5053166E8317aa138;
 
         // Fetch network configuration (router and RMN proxy addresses)
         HelperConfig helperConfig = new HelperConfig();
@@ -45,9 +44,7 @@ contract DeployBurnFromMintTokenPoolSource is Script {
         // IBurnMintERC20 token = IBurnMintERC20(tokenAddress);
         //
         // // Mainnet minting contract address
-        // // address minter = 0x69088d25a635D22dcbe7c4A5C7707B9cc64bD114;
-        // // Dev minting contract address
-        // address minter = 0x6C5FfEB3507055aFc2461394c1AE8C1Fe2d870AB;
+        // address minter = 0x69088d25a635D22dcbe7c4A5C7707B9cc64bD114;
         //
         //
         // // Deploy the BurnFromMintTokenPool contract associated with the token
@@ -68,11 +65,12 @@ contract DeployBurnFromMintTokenPoolSource is Script {
 
         // // STEP 2
         // // Serialize and write the token pool address to a new JSON file
+        // BurnFromMintTokenPool tokenPool = BurnFromMintTokenPool(0x1016225Ba7f32e3a6f2842A380D5846D8756648c);
         // string memory jsonObj = "internal_key";
         // string memory key = string(abi.encodePacked("deployedTokenPool_", chainName));
         // string memory finalJson = vm.serializeAddress(jsonObj, key, address(tokenPool));
         //
-        // string memory poolFileName = string(abi.encodePacked("./scripts/deploy/output/deployedTokenPool_", chainName, ".json"));
+        // string memory poolFileName = string(abi.encodePacked("./scripts/deploy/mainnet/output/deployedTokenPool_", chainName, ".json"));
         // console.log("Writing deployed token pool address to file:", poolFileName);
         // vm.writeJson(finalJson, poolFileName);
         //
@@ -105,7 +103,7 @@ contract DeployBurnFromMintTokenPoolSource is Script {
 
 
         // // Step 4
-        // address poolAddress = 0x2dDf7716E27b144C979C98858f407C601716156b;
+        // address poolAddress = ;
         //
         // // Instantiate the TokenAdminRegistry contract
         // TokenAdminRegistry tokenAdminRegistryContract = TokenAdminRegistry(tokenAdminRegistry);
@@ -128,10 +126,10 @@ contract DeployBurnFromMintTokenPoolSource is Script {
         // console.log("Pool set for token", tokenAddress, "to", poolAddress);
 
         // Step 5
-        address poolAddress = 0x2dDf7716E27b144C979C98858f407C601716156b;
-        address remotePoolAddress = 0x01805CD1300Bb37Eb61ff4780f6A70a0Ca4dE2bd;
-        address remoteTokenAddress = 0x9516d5F1362F439a74963304E922e3A738D8CE02;
-        uint64 remoteChainId = 421614;
+        address poolAddress = 0x1016225Ba7f32e3a6f2842A380D5846D8756648c;
+        address remotePoolAddress = 0x4ca21322011b2e881f8146069a999D085D68ba72;
+        address remoteTokenAddress = 0xB57B25851fE2311CC3fE511c8F10E868932e0680;
+        uint64 remoteChainId = 43114;
 
         // For remotePoolAddresses, create an array with the remotePoolAddress
         address[] memory remotePoolAddresses = new address[](1);
