@@ -30,7 +30,12 @@ contract HelperConfig is Script {
             activeNetworkConfig = getEthereumMainnetConfig();
         } else if (block.chainid == 43114) {
             activeNetworkConfig = getAvalancheMainnetConfig();
+        } else if (block.chainid == 137) {
+            activeNetworkConfig = getPolygonPosMainnetConfig();
+        } else if (block.chainid == 80094) {
+            activeNetworkConfig = getBerachainMainnetConfig();
         }
+
     }
 
     function getEthereumMainnetConfig() public pure returns (NetworkConfig memory) {
@@ -59,6 +64,34 @@ contract HelperConfig is Script {
             nativeCurrencySymbol: "AVAX"
         });
         return avalancheMainnetConfig;
+    }
+
+    function getPolygonPosMainnetConfig() public pure returns (NetworkConfig memory) {
+        NetworkConfig memory polygonPosMainnetConfig = NetworkConfig({
+            chainSelector: 4051577828743386545,
+            router: 0x849c5ED5a80F5B408Dd4969b78c2C8fdf0565Bfe,
+            rmnProxy: 0xf1ceAa46D8d13Cac9fC38aaEF3d3d14754C5A9c2,
+            tokenAdminRegistry: 0x00F027eA6D0fb03256A15E9182B2B9227A4931d8,
+            registryModuleOwnerCustom: 0xc751E86208F0F8aF2d5CD0e29716cA7AD98B5eF5,
+            link: 0xb0897686c545045aFc77CF20eC7A532E3120E0F1,
+            confirmations: 10,
+            nativeCurrencySymbol: "POL"
+        });
+        return polygonPosMainnetConfig;
+    }
+
+    function getBerachainMainnetConfig() public pure returns (NetworkConfig memory) {
+        NetworkConfig memory berachainMainnetConfig = NetworkConfig({
+            chainSelector: 1294465214383781161,
+            router: 0x71a275704c283486fBa26dad3dd0DB78804426eF,
+            rmnProxy: 0x25943b8C30C47F4eF09CcF2BAE315EbaF591881d,
+            tokenAdminRegistry: 0x0944C3Fb1dB7D165336569221995B31cBE6c8A55,
+            registryModuleOwnerCustom: 0x452b8543fdF4Da91FE914CC92c3B79632730cFC7,
+            link: 0x71052BAe71C25C78E37fD12E5ff1101A71d9018F,
+            confirmations: 10,
+            nativeCurrencySymbol: "BERA"
+        });
+        return berachainMainnetConfig;
     }
 
     function getEthereumSepoliaConfig() public pure returns (NetworkConfig memory) {

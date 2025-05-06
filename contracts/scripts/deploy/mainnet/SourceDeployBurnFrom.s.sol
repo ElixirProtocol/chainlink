@@ -127,9 +127,9 @@ contract DeployBurnFromMintTokenPoolSource is Script {
 
         // Step 5
         address poolAddress = 0x1016225Ba7f32e3a6f2842A380D5846D8756648c;
-        address remotePoolAddress = 0x4ca21322011b2e881f8146069a999D085D68ba72;
-        address remoteTokenAddress = 0xB57B25851fE2311CC3fE511c8F10E868932e0680;
-        uint64 remoteChainId = 43114;
+        address remotePoolAddress = 0x294a977DAa5B8ca88bcA0f51510E2F50Caf9502C;
+        address remoteTokenAddress = 0x7203fB920421170Cc4Da001d758fdE8f391A0570;
+        uint64 remoteChainId = 80094;
 
         // For remotePoolAddresses, create an array with the remotePoolAddress
         address[] memory remotePoolAddresses = new address[](1);

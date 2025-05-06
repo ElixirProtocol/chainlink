@@ -21,8 +21,11 @@ library HelperUtils {
             return "ethereum";
         } else if (chainId == 43114) {
             return "avalanche";
-        }
-        else {
+        } else if (chainId == 137) {
+            return "polygonPos";
+        } else if (chainId == 80094) {
+            return "berachain";
+        } else {
             revert("Unsupported chain ID");
         }
     }
@@ -44,6 +47,10 @@ library HelperUtils {
             return helperConfig.getEthereumMainnetConfig();
         } else if (chainId == 43114) {
             return helperConfig.getAvalancheMainnetConfig();
+        } else if (chainId == 137) {
+            return helperConfig.getPolygonPosMainnetConfig();
+        } else if (chainId == 80094) {
+            return helperConfig.getBerachainMainnetConfig();
         } else {
             revert("Unsupported chain ID");
         }

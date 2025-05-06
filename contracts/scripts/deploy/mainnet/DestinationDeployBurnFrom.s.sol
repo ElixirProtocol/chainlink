@@ -23,7 +23,7 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
         // string memory root = vm.projectRoot();
 
         // Mainnet
-        address tokenAddress = 0xB57B25851fE2311CC3fE511c8F10E868932e0680;
+        address tokenAddress = 0x7203fB920421170Cc4Da001d758fdE8f391A0570;
 
         // Fetch network configuration (router and RMN proxy addresses)
         HelperConfig helperConfig = new HelperConfig();
@@ -43,7 +43,7 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
         // IBurnMintERC20 token = IBurnMintERC20(tokenAddress);
         //
         // // Mainnet minting contract address
-        // address minter = 0xB57B25851fE2311CC3fE511c8F10E868932e0680;
+        // address minter = 0x7203fB920421170Cc4Da001d758fdE8f391A0570;
         //
         // // Deploy the BurnFromMintTokenPool contract associated with the token
         // BurnFromMintTokenPool tokenPool = new BurnFromMintTokenPool (
@@ -78,8 +78,8 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
         // // Register the admin via owner() function
         // registryContract.registerAdminViaGetCCIPAdmin(tokenAddress);
         // console.log("Admin claimed successfully for token:", tokenAddress);
-
-
+        //
+        //
         // // STEP 3
         // // Instantiate the TokenAdminRegistry contract
         // TokenAdminRegistry tokenAdminRegistryContract = TokenAdminRegistry(tokenAdminRegistry);
@@ -99,7 +99,7 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
         // console.log("Accepted admin role for token:", tokenAddress);
 
         // // Step 4
-        // address poolAddress = 0x4ca21322011b2e881f8146069a999D085D68ba72;
+        // address poolAddress = 0x294a977DAa5B8ca88bcA0f51510E2F50Caf9502C;
         //
         // // Instantiate the TokenAdminRegistry contract
         // TokenAdminRegistry tokenAdminRegistryContract = TokenAdminRegistry(tokenAdminRegistry);
@@ -121,61 +121,61 @@ contract DeployBurnFromMintTokenPoolDestination is Script {
         // console.log("Pool set for token", tokenAddress, "to", poolAddress);
 
 
-        // Step 5
-        address poolAddress = 0x4ca21322011b2e881f8146069a999D085D68ba72;
-        address remotePoolAddress = 0x1016225Ba7f32e3a6f2842A380D5846D8756648c;
-        address remoteTokenAddress = 0x15700B564Ca08D9439C58cA5053166E8317aa138;
-        uint64 remoteChainId = 1;
-
-        // For remotePoolAddresses, create an array with the remotePoolAddress
-        address[] memory remotePoolAddresses = new address[](1);
-        remotePoolAddresses[0] = remotePoolAddress;
-
-        HelperConfig.NetworkConfig memory remoteNetworkConfig =
-            HelperUtils.getNetworkConfig(helperConfig, remoteChainId);
-
-        uint64 remoteChainSelector = remoteNetworkConfig.chainSelector;
-
-        require(poolAddress != address(0), "Invalid pool address");
-        require(remotePoolAddress != address(0), "Invalid remote pool address");
-        require(remoteTokenAddress != address(0), "Invalid remote token address");
-        require(remoteChainSelector != 0, "chainSelector is not defined for the remote chain");
-
-        // Instantiate the local TokenPool contract
-        TokenPool poolContract = TokenPool(poolAddress);
-
-        // Prepare chain update data for configuring cross-chain transfers
-        TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-
-        // Encode remote pool addresses
-        bytes[] memory remotePoolAddressesEncoded = new bytes[](remotePoolAddresses.length);
-        for (uint256 i = 0; i < remotePoolAddresses.length; i++) {
-            remotePoolAddressesEncoded[i] = abi.encode(remotePoolAddresses[i]);
-        }
-
-        chainUpdates[0] = TokenPool.ChainUpdate({
-            remoteChainSelector: remoteChainSelector, // Chain selector of the remote chain
-            remotePoolAddresses: remotePoolAddressesEncoded, // Array of encoded addresses of the remote pools
-            remoteTokenAddress: abi.encode(remoteTokenAddress), // Encoded address of the remote token
-            outboundRateLimiterConfig: RateLimiter.Config({
-                isEnabled: false, // Set to true to enable outbound rate limiting
-                capacity: 0, // Max tokens allowed in the outbound rate limiter
-                rate: 0 // Refill rate per second for the outbound rate limiter
-            }),
-            inboundRateLimiterConfig: RateLimiter.Config({
-                isEnabled: false, // Set to true to enable inbound rate limiting
-                capacity: 0, // Max tokens allowed in the inbound rate limiter
-                rate: 0 // Refill rate per second for the inbound rate limiter
-            })
-        });
-
-        // Create an empty array for chainSelectorRemovals
-        uint64[] memory chainSelectorRemovals = new uint64[](0);
-
-        // Apply the chain updates to configure the pool
-        poolContract.applyChainUpdates(chainSelectorRemovals, chainUpdates);
-
-        console.log("Chain update applied to pool at address:", poolAddress);
+        // // Step 5
+        // address poolAddress = 0x294a977DAa5B8ca88bcA0f51510E2F50Caf9502C;
+        // address remotePoolAddress = 0x1016225Ba7f32e3a6f2842A380D5846D8756648c;
+        // address remoteTokenAddress = 0x15700B564Ca08D9439C58cA5053166E8317aa138;
+        // uint64 remoteChainId = 1;
+        //
+        // // For remotePoolAddresses, create an array with the remotePoolAddress
+        // address[] memory remotePoolAddresses = new address[](1);
+        // remotePoolAddresses[0] = remotePoolAddress;
+        //
+        // HelperConfig.NetworkConfig memory remoteNetworkConfig =
+        //     HelperUtils.getNetworkConfig(helperConfig, remoteChainId);
+        //
+        // uint64 remoteChainSelector = remoteNetworkConfig.chainSelector;
+        //
+        // require(poolAddress != address(0), "Invalid pool address");
+        // require(remotePoolAddress != address(0), "Invalid remote pool address");
+        // require(remoteTokenAddress != address(0), "Invalid remote token address");
+        // require(remoteChainSelector != 0, "chainSelector is not defined for the remote chain");
+        //
+        // // Instantiate the local TokenPool contract
+        // TokenPool poolContract = TokenPool(poolAddress);
+        //
+        // // Prepare chain update data for configuring cross-chain transfers
+        // TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+        //
+        // // Encode remote pool addresses
+        // bytes[] memory remotePoolAddressesEncoded = new bytes[](remotePoolAddresses.length);
+        // for (uint256 i = 0; i < remotePoolAddresses.length; i++) {
+        //     remotePoolAddressesEncoded[i] = abi.encode(remotePoolAddresses[i]);
+        // }
+        //
+        // chainUpdates[0] = TokenPool.ChainUpdate({
+        //     remoteChainSelector: remoteChainSelector, // Chain selector of the remote chain
+        //     remotePoolAddresses: remotePoolAddressesEncoded, // Array of encoded addresses of the remote pools
+        //     remoteTokenAddress: abi.encode(remoteTokenAddress), // Encoded address of the remote token
+        //     outboundRateLimiterConfig: RateLimiter.Config({
+        //         isEnabled: false, // Set to true to enable outbound rate limiting
+        //         capacity: 0, // Max tokens allowed in the outbound rate limiter
+        //         rate: 0 // Refill rate per second for the outbound rate limiter
+        //     }),
+        //     inboundRateLimiterConfig: RateLimiter.Config({
+        //         isEnabled: false, // Set to true to enable inbound rate limiting
+        //         capacity: 0, // Max tokens allowed in the inbound rate limiter
+        //         rate: 0 // Refill rate per second for the inbound rate limiter
+        //     })
+        // });
+        //
+        // // Create an empty array for chainSelectorRemovals
+        // uint64[] memory chainSelectorRemovals = new uint64[](0);
+        //
+        // // Apply the chain updates to configure the pool
+        // poolContract.applyChainUpdates(chainSelectorRemovals, chainUpdates);
+        //
+        // console.log("Chain update applied to pool at address:", poolAddress);
 
 
         vm.stopBroadcast();
