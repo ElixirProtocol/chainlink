@@ -1,17 +1,17 @@
 {
   "deUSD": {
-    "name": "USD",
-    "symbol": "USD",
+    "name": "Elixir deUSD",
+    "symbol": "deUSD",
     "decimals": 18,
     "maxSupply": 0,
     "withGetCCIPAdmin": false,
     "ccipAdminAddress": "0x0000000000000000000000000000000000000000"
   },
-  "tokenAmountToMint": 1000000000000000000000,
+  "tokenAmountToMint": 1000000000000000000,
   "tokenAmountToTransfer": 1000000000000000000,
   "feeType": "native",
   "remoteChains": {
-    "11155111": 421614,
-    "421614": 11155111
+    "1": 80094,
+    "80094": 1
   }
 }

@@ -17,6 +17,14 @@ library HelperUtils {
             return "arbitrumSepolia";
         } else if (chainId == 84532) {
             return "baseSepolia";
+        } else if (chainId == 1) {
+            return "ethereum";
+        } else if (chainId == 43114) {
+            return "avalanche";
+        } else if (chainId == 137) {
+            return "polygonPos";
+        } else if (chainId == 80094) {
+            return "berachain";
         } else {
             revert("Unsupported chain ID");
         }
@@ -35,6 +43,14 @@ library HelperUtils {
             return helperConfig.getArbitrumSepolia();
         } else if (chainId == 84532) {
             return helperConfig.getBaseSepoliaConfig();
+        } else if (chainId == 1) {
+            return helperConfig.getEthereumMainnetConfig();
+        } else if (chainId == 43114) {
+            return helperConfig.getAvalancheMainnetConfig();
+        } else if (chainId == 137) {
+            return helperConfig.getPolygonPosMainnetConfig();
+        } else if (chainId == 80094) {
+            return helperConfig.getBerachainMainnetConfig();
         } else {
             revert("Unsupported chain ID");
         }
